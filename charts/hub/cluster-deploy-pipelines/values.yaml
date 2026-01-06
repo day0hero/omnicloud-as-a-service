@@ -1,4 +1,9 @@
 # Default values for cluster-deploy-pipelines
+
+# Namespace where Pipeline and Tasks are installed (where Helm chart is installed)
+# PipelineRuns can run in this namespace or reference the Pipeline from other namespaces
+pipelineNamespace: openshift-pipelines
+
 serviceAccount:
   # Set to false if you want to use an existing ServiceAccount instead of creating one
   create: true

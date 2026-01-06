@@ -2,6 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: deploy-cluster
+  namespace: {{ .Values.pipelineNamespace }}
   labels:
     {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
 spec:

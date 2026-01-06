@@ -2,8 +2,12 @@ apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
   name: deploy-cluster-<cluster-name>-<timestamp>
-  namespace: openshift-pipelines
+  namespace: {{ .Values.pipelineNamespace }}
   # Note: Replace <cluster-name> with actual cluster name and <timestamp> with unique identifier
+  # IMPORTANT: PipelineRuns must be in the same namespace as the Pipeline and Tasks
+  # If you need to run PipelineRuns in a different namespace (e.g., "hive"), you must:
+  # 1. Install the Pipeline and Tasks in that namespace, OR
+  # 2. Keep PipelineRuns in the same namespace as the Pipeline (recommended)
 spec:
   pipelineRef:
     name: deploy-cluster
