@@ -1,0 +1,38 @@
+{{- if .Values.workspaces.createPVCs }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cluster-deploy-pipelines.fullname" . }}-install-config
+  namespace: {{ .Values.serviceAccount.namespace }}
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+    workspace: install-config
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.workspaces.installConfig.storageSize }}
+  {{- if .Values.workspaces.installConfig.storageClassName }}
+  storageClassName: {{ .Values.workspaces.installConfig.storageClassName }}
+  {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cluster-deploy-pipelines.fullname" . }}-kubeconfig
+  namespace: {{ .Values.serviceAccount.namespace }}
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+    workspace: kubeconfig
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.workspaces.kubeconfig.storageSize }}
+  {{- if .Values.workspaces.kubeconfig.storageClassName }}
+  storageClassName: {{ .Values.workspaces.kubeconfig.storageClassName }}
+  {{- end }}
+{{- end }}

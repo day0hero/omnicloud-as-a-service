@@ -1,0 +1,46 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: deploy-cluster-my-aws-cluster-shared
+  namespace: openshift-pipelines
+spec:
+  pipelineRef:
+    name: deploy-cluster
+  serviceAccountName: cluster-deploy-pipelines-sa
+  params:
+  - name: cluster-name
+    value: "my-aws-cluster"
+  - name: base-domain
+    value: "example.com"
+  - name: cloud-provider
+    value: "Amazon"
+  - name: cloud-region
+    value: "us-east-1"
+  - name: cluster-version
+    value: "img4.19.9-x86-64-appsub"
+  - name: control-plane-machine-type
+    value: "m5.xlarge"
+  - name: worker-machine-type
+    value: "m5.4xlarge"
+  - name: cluster-group
+    value: "devops"
+  - name: control-plane-replicas
+    value: "3"
+  - name: worker-replicas
+    value: "3"
+  - name: secret-store-name
+    value: "vault-backend"
+  - name: aws-creds-key-path
+    value: "secret/data/hub/aws"
+  - name: pullsecret-key-path
+    value: "pushsecrets/global-pull-secret"
+  - name: timeout-minutes
+    value: "90"
+  workspaces:
+  # Using pre-created shared PVCs (created by Helm chart)
+  - name: install-config
+    persistentVolumeClaim:
+      claimName: cluster-deploy-pipelines-install-config
+  - name: kubeconfig
+    persistentVolumeClaim:
+      claimName: cluster-deploy-pipelines-kubeconfig

@@ -19,3 +19,15 @@ externalSecrets:
     key: secret/data/hub/azure
   pullSecret:
     key: pushsecrets/global-pull-secret
+
+# Pipeline workspace PVCs
+workspaces:
+  # Set to true to create PVCs via Helm chart (shared across pipeline runs)
+  # Set to false to use volumeClaimTemplate in PipelineRun (per-run PVCs)
+  createPVCs: false
+  installConfig:
+    storageSize: 1Gi
+    storageClassName: ""  # Use default storage class if empty
+  kubeconfig:
+    storageSize: 1Gi
+    storageClassName: ""  # Use default storage class if empty

@@ -51,6 +51,15 @@ spec:
   - name: timeout-minutes
     value: "90"
   workspaces:
+  # Option 1: Use pre-created shared PVCs (if createPVCs: true in values.yaml)
+  # - name: install-config
+  #   persistentVolumeClaim:
+  #     claimName: cluster-deploy-pipelines-install-config
+  # - name: kubeconfig
+  #   persistentVolumeClaim:
+  #     claimName: cluster-deploy-pipelines-kubeconfig
+  
+  # Option 2: Create PVC per PipelineRun (default)
   - name: install-config
     volumeClaimTemplate:
       spec:

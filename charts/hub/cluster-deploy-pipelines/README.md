@@ -32,6 +32,40 @@ helm install cluster-deploy-pipelines ./charts/hub/cluster-deploy-pipelines \
   --create-namespace
 ```
 
+### Workspace PVCs
+
+The pipeline requires two workspaces for sharing content between tasks:
+- `install-config`: Stores install-config.yaml
+- `kubeconfig`: Stores cluster kubeconfig
+
+**Option 1: Shared PVCs (Recommended for multiple pipeline runs)**
+
+Create shared PVCs that can be reused across pipeline runs:
+
+```bash
+helm install cluster-deploy-pipelines ./charts/hub/cluster-deploy-pipelines \
+  --namespace openshift-pipelines \
+  --create-namespace \
+  --set workspaces.createPVCs=true \
+  --set workspaces.installConfig.storageSize=2Gi \
+  --set workspaces.kubeconfig.storageSize=2Gi
+```
+
+Then reference them in PipelineRun:
+```yaml
+workspaces:
+- name: install-config
+  persistentVolumeClaim:
+    claimName: cluster-deploy-pipelines-install-config
+- name: kubeconfig
+  persistentVolumeClaim:
+    claimName: cluster-deploy-pipelines-kubeconfig
+```
+
+**Option 2: Per-Run PVCs (Default)**
+
+Each PipelineRun creates its own PVCs using `volumeClaimTemplate` (default behavior). See examples for this approach.
+
 ## Usage
 
 ### Method 1: Using PipelineRun in OpenShift Console
@@ -66,8 +100,11 @@ helm install cluster-deploy-pipelines ./charts/hub/cluster-deploy-pipelines \
 Create a PipelineRun YAML file based on the examples:
 
 ```bash
-# For AWS
+# For AWS (with per-run PVCs)
 oc apply -f charts/hub/cluster-deploy-pipelines/examples/pipelinerun-aws.yaml
+
+# For AWS (with shared PVCs)
+oc apply -f charts/hub/cluster-deploy-pipelines/examples/pipelinerun-aws-shared-pvc.yaml
 
 # For GCP
 oc apply -f charts/hub/cluster-deploy-pipelines/examples/pipelinerun-gcp.yaml
@@ -77,6 +114,8 @@ oc apply -f charts/hub/cluster-deploy-pipelines/examples/pipelinerun-azure.yaml
 ```
 
 Edit the file to customize parameters before applying.
+
+**Note:** If using shared PVCs, ensure they are created first (see Installation section).
 
 ### Method 3: Git-based Submission
 
@@ -154,6 +193,11 @@ oc get managedcluster <cluster-name>
 | `serviceAccount.name` | ServiceAccount name | `cluster-deploy-pipelines-sa` |
 | `serviceAccount.namespace` | ServiceAccount namespace | `openshift-pipelines` |
 | `kubectlImage` | Image for kubectl/oc commands | `quay.io/openshift/origin-cli:latest` |
+| `workspaces.createPVCs` | Create shared PVCs via Helm | `false` |
+| `workspaces.installConfig.storageSize` | Size of install-config PVC | `1Gi` |
+| `workspaces.installConfig.storageClassName` | Storage class for install-config PVC | `""` (default) |
+| `workspaces.kubeconfig.storageSize` | Size of kubeconfig PVC | `1Gi` |
+| `workspaces.kubeconfig.storageClassName` | Storage class for kubeconfig PVC | `""` (default) |
 
 ## Migration from Ansible
 
