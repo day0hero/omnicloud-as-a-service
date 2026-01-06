@@ -2,6 +2,10 @@
 serviceAccount:
   name: cluster-deploy-pipelines-sa
   namespace: openshift-pipelines
+  # Additional namespaces where the same ServiceAccount name exists and should be bound to ClusterRole
+  # This is useful if you have the ServiceAccount in multiple namespaces (e.g., hive, openshift-pipelines)
+  # Example: additionalNamespaces: ["hive"]
+  additionalNamespaces: []
 
 # Image for tasks that need kubectl/oc
 kubectlImage: quay.io/openshift/origin-cli:latest
