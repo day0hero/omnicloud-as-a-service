@@ -202,9 +202,33 @@ spec:
       set -e
       
       CLUSTER_NAME=$(params.cluster-name)
-      INSTALL_CONFIG=$(cat $(workspaces.install-config.path)/install-config.yaml | base64 -w 0)
+      INSTALL_CONFIG_PATH=$(workspaces.install-config.path)/install-config.yaml
       
+      echo "Creating secret ${CLUSTER_NAME}-install-config in namespace $CLUSTER_NAME"
+      
+      # Verify namespace exists
+      if ! oc get namespace "$CLUSTER_NAME" &>/dev/null; then
+        echo "Error: Namespace $CLUSTER_NAME does not exist"
+        exit 1
+      fi
+      
+      # Verify install-config.yaml exists
+      if [ ! -f "$INSTALL_CONFIG_PATH" ]; then
+        echo "Error: install-config.yaml not found at $INSTALL_CONFIG_PATH"
+        exit 1
+      fi
+      
+      # Create secret using --dry-run=client and apply
+      # Note: Tekton may show "unsuccessful cred copy" warnings - these are harmless
       oc create secret generic ${CLUSTER_NAME}-install-config \
-        --from-file=install-config.yaml=$(workspaces.install-config.path)/install-config.yaml \
+        --from-file=install-config.yaml=$INSTALL_CONFIG_PATH \
         -n $CLUSTER_NAME \
         --dry-run=client -o yaml | oc apply -f -
+      
+      # Verify secret was created
+      if ! oc get secret ${CLUSTER_NAME}-install-config -n $CLUSTER_NAME &>/dev/null; then
+        echo "Error: Secret not found after creation"
+        exit 1
+      fi
+      
+      echo "Secret ${CLUSTER_NAME}-install-config created and verified successfully"
