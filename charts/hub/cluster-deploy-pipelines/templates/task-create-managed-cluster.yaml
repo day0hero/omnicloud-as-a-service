@@ -25,6 +25,8 @@ spec:
       CLUSTER_NAME=$(params.cluster-name)
       CLUSTER_GROUP=$(params.cluster-group)
       
+      # Create ManagedCluster without hubAcceptsClient
+      # ACM will automatically accept the cluster when the import secret is created
       cat <<EOF | oc apply -f -
       apiVersion: cluster.open-cluster-management.io/v1
       kind: ManagedCluster
@@ -35,8 +37,7 @@ spec:
           vendor: OpenShift
           clusterGroup: $CLUSTER_GROUP
           cluster.open-cluster-management.io/clusterset: default
-      spec:
-        hubAcceptsClient: true
       EOF
       
       echo "ManagedCluster $CLUSTER_NAME created"
+      echo "Note: Cluster will be automatically accepted when import secret is created"
