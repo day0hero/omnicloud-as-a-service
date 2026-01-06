@@ -34,6 +34,7 @@ GCP_KEY=$(oc get configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" -o jsonpath='{.data
 AZURE_KEY=$(oc get configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" -o jsonpath='{.data.azure-creds-key-path}')
 PULLSECRET_KEY=$(oc get configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" -o jsonpath='{.data.pullsecret-key-path}')
 TIMEOUT=$(oc get configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" -o jsonpath='{.data.timeout-minutes}')
+SERVICE_ACCOUNT_FROM_CM=$(oc get configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" -o jsonpath='{.data.service-account-name}' 2>/dev/null || echo "")
 
 # Validate required fields
 if [ -z "$CLUSTER_NAME" ] || [ -z "$BASE_DOMAIN" ] || [ -z "$CLOUD_PROVIDER" ] || \
@@ -54,6 +55,8 @@ GCP_KEY=${GCP_KEY:-secret/data/hub/gcp}
 AZURE_KEY=${AZURE_KEY:-secret/data/hub/azure}
 PULLSECRET_KEY=${PULLSECRET_KEY:-pushsecrets/global-pull-secret}
 TIMEOUT=${TIMEOUT:-90}
+# Use serviceAccountName from ConfigMap if provided, otherwise use script parameter or default
+SERVICE_ACCOUNT=${SERVICE_ACCOUNT_FROM_CM:-$SERVICE_ACCOUNT}
 
 # Generate unique PipelineRun name
 TIMESTAMP=$(date +%s)
