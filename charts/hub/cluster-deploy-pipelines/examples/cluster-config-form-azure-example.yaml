@@ -35,4 +35,4 @@ data:
   
   # Pipeline Configuration
   timeout-minutes: "90"
-  service-account-name: "cluster-deploy-pipelines-sa"  # ServiceAccount to use for PipelineRun
+  service-account-name: ""  # ServiceAccount to use (empty = "pipeline" for UI, or set to "cluster-deploy-pipelines-sa")

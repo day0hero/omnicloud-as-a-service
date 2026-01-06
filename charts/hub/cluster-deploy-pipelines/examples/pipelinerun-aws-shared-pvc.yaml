@@ -6,6 +6,8 @@ metadata:
 spec:
   pipelineRef:
     name: deploy-cluster
+  # Use "pipeline" for UI/console usage, or "cluster-deploy-pipelines-sa" for provisioned service account
+  # Both service accounts are bound to the necessary RBAC permissions
   serviceAccountName: cluster-deploy-pipelines-sa
   params:
   - name: cluster-name

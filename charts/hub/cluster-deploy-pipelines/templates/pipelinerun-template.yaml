@@ -7,7 +7,11 @@ metadata:
 spec:
   pipelineRef:
     name: deploy-cluster
+{{- if .Values.serviceAccount.defaultServiceAccount }}
+  serviceAccountName: {{ .Values.serviceAccount.defaultServiceAccount }}
+{{- else }}
   serviceAccountName: {{ .Values.serviceAccount.name }}
+{{- end }}
   params:
   # Required parameters
   - name: cluster-name

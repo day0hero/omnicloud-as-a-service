@@ -33,4 +33,4 @@ data:
   azure-creds-key-path: "secret/data/hub/azure"  # Vault path for Azure (if using Azure)
   pullsecret-key-path: "pushsecrets/global-pull-secret"  # Vault path for pull secret
   timeout-minutes: "90"
-  service-account-name: "cluster-deploy-pipelines-sa"  # ServiceAccount to use for PipelineRun
+  service-account-name: ""  # ServiceAccount to use for PipelineRun (leave empty to use default: "pipeline" for UI, or set to "cluster-deploy-pipelines-sa" for provisioned SA)

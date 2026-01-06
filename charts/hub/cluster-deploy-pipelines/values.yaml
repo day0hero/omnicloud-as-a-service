@@ -4,6 +4,13 @@ serviceAccount:
   create: true
   name: cluster-deploy-pipelines-sa
   namespace: openshift-pipelines
+  # Default service account for UI/console usage (when serviceAccountName is not specified in PipelineRun)
+  # Set to "pipeline" to allow UI users to use the default pipeline service account
+  # Set to the provisioned service account name to require explicit service account usage
+  defaultServiceAccount: pipeline
+  # Bind the default pipeline service account (for UI usage) to RBAC
+  # Set to true to automatically bind the "pipeline" SA in openshift-pipelines namespace
+  bindPipelineSA: true
   # Additional namespaces where ServiceAccounts should be bound to ClusterRole
   # This is useful if you have ServiceAccounts in multiple namespaces that need the same permissions
   # Each entry can specify a different ServiceAccount name if needed

@@ -7,7 +7,7 @@ set -e
 CONFIGMAP_NAME=${1:-cluster-config-form}
 NAMESPACE=${2:-openshift-pipelines}
 PIPELINE_NAME=${3:-deploy-cluster}
-SERVICE_ACCOUNT=${4:-cluster-deploy-pipelines-sa}
+SERVICE_ACCOUNT=${4:-pipeline}
 
 if ! oc get configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" &>/dev/null; then
   echo "Error: ConfigMap $CONFIGMAP_NAME not found in namespace $NAMESPACE"
@@ -55,8 +55,10 @@ GCP_KEY=${GCP_KEY:-secret/data/hub/gcp}
 AZURE_KEY=${AZURE_KEY:-secret/data/hub/azure}
 PULLSECRET_KEY=${PULLSECRET_KEY:-pushsecrets/global-pull-secret}
 TIMEOUT=${TIMEOUT:-90}
-# Use serviceAccountName from ConfigMap if provided, otherwise use script parameter or default
-SERVICE_ACCOUNT=${SERVICE_ACCOUNT_FROM_CM:-$SERVICE_ACCOUNT}
+# Use serviceAccountName from ConfigMap if provided and non-empty, otherwise use script parameter or default
+if [ -n "$SERVICE_ACCOUNT_FROM_CM" ]; then
+  SERVICE_ACCOUNT="$SERVICE_ACCOUNT_FROM_CM"
+fi
 
 # Generate unique PipelineRun name
 TIMESTAMP=$(date +%s)
