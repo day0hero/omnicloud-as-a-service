@@ -1,0 +1,57 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: deploy-cluster-my-gcp-cluster
+  namespace: openshift-pipelines
+spec:
+  pipelineRef:
+    name: deploy-cluster
+  serviceAccountName: cluster-deploy-pipelines-sa
+  params:
+  - name: cluster-name
+    value: "my-gcp-cluster"
+  - name: base-domain
+    value: "example.com"
+  - name: cloud-provider
+    value: "Google"
+  - name: cloud-region
+    value: "us-central1"
+  - name: cluster-version
+    value: "img4.19.9-x86-64-appsub"
+  - name: control-plane-machine-type
+    value: "n1-standard-4"
+  - name: worker-machine-type
+    value: "n1-standard-8"
+  - name: cluster-group
+    value: "devops"
+  - name: control-plane-replicas
+    value: "3"
+  - name: worker-replicas
+    value: "3"
+  - name: gcp-project-id
+    value: "my-gcp-project-id"
+  - name: secret-store-name
+    value: "vault-backend"
+  - name: gcp-creds-key-path
+    value: "secret/data/hub/gcp"
+  - name: pullsecret-key-path
+    value: "pushsecrets/global-pull-secret"
+  - name: timeout-minutes
+    value: "90"
+  workspaces:
+  - name: install-config
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: kubeconfig
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

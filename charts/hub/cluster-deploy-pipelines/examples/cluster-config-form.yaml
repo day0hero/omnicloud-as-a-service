@@ -1,0 +1,35 @@
+# Cluster Configuration Form
+# This file can be committed to git and used to trigger cluster deployments
+# Users can fill out this form and commit it to trigger a PipelineRun
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-config-form
+  namespace: openshift-pipelines
+  annotations:
+    # This annotation can be used by a webhook or automation to trigger PipelineRun
+    trigger.tekton.dev/pipeline: deploy-cluster
+data:
+  # Required Configuration
+  cluster-name: ""  # e.g., "my-cluster"
+  base-domain: ""   # e.g., "example.com"
+  cloud-provider: ""  # One of: Amazon, Google, Azure
+  cloud-region: ""    # e.g., "us-east-1", "us-central1", "eastus"
+  cluster-version: ""  # e.g., "img4.19.9-x86-64-appsub" (check with: oc get clusterimageset)
+  control-plane-machine-type: ""  # e.g., "m5.xlarge" (AWS), "n1-standard-4" (GCP), "Standard_D8s_v3" (Azure)
+  worker-machine-type: ""         # e.g., "m5.4xlarge" (AWS), "n1-standard-8" (GCP), "Standard_D16s_v3" (Azure)
+  
+  # Optional Configuration (defaults shown)
+  cluster-group: "devops"
+  control-plane-replicas: "3"
+  worker-replicas: "3"
+  azure-resource-group: ""  # Required for Azure
+  gcp-project-id: ""        # Required for GCP
+  ssh-public-key: ""        # Optional SSH public key
+  secret-store-name: "vault-backend"  # ClusterSecretStore name
+  aws-creds-key-path: "secret/data/hub/aws"  # Vault path for AWS (if using AWS)
+  gcp-creds-key-path: "secret/data/hub/gcp"  # Vault path for GCP (if using GCP)
+  azure-creds-key-path: "secret/data/hub/azure"  # Vault path for Azure (if using Azure)
+  pullsecret-key-path: "pushsecrets/global-pull-secret"  # Vault path for pull secret
+  timeout-minutes: "90"

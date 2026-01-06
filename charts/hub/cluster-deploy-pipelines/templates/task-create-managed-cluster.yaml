@@ -1,0 +1,41 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: create-managed-cluster
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Creates ManagedCluster resource
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: cluster-group
+    description: Cluster group label
+    type: string
+    default: "devops"
+  steps:
+  - name: create-managed-cluster
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      CLUSTER_GROUP=$(params.cluster-group)
+      
+      cat <<EOF | oc apply -f -
+      apiVersion: cluster.open-cluster-management.io/v1
+      kind: ManagedCluster
+      metadata:
+        name: $CLUSTER_NAME
+        labels:
+          cloud: auto-detect
+          vendor: OpenShift
+          clusterGroup: $CLUSTER_GROUP
+          cluster.open-cluster-management.io/clusterset: default
+      spec:
+        hubAcceptsClient: true
+      EOF
+      
+      echo "ManagedCluster $CLUSTER_NAME created"

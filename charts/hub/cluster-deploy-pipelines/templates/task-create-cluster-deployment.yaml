@@ -1,0 +1,151 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: create-cluster-deployment
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Creates ClusterDeployment resource
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: base-domain
+    description: Base domain for the cluster
+    type: string
+  - name: cloud-provider
+    description: Cloud provider (Amazon, Google, or Azure)
+    type: string
+  - name: cloud-region
+    description: Cloud region
+    type: string
+  - name: cluster-version
+    description: Cluster version/image set
+    type: string
+  - name: azure-resource-group
+    description: Azure base domain resource group name
+    type: string
+    default: ""
+  steps:
+  - name: create-cluster-deployment
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      BASE_DOMAIN=$(params.base-domain)
+      PROVIDER=$(params.cloud-provider)
+      REGION=$(params.cloud-region)
+      VERSION=$(params.cluster-version)
+      
+      # Determine cloud label
+      case "$PROVIDER" in
+        Google|GCP)
+          CLOUD_LABEL="GCP"
+          ;;
+        Azure)
+          CLOUD_LABEL="Azure"
+          ;;
+        Amazon|AWS|*)
+          CLOUD_LABEL="AWS"
+          ;;
+      esac
+      
+      # Generate ClusterDeployment YAML based on provider
+      case "$PROVIDER" in
+        Google|GCP)
+          cat <<EOF | oc apply -f -
+          apiVersion: hive.openshift.io/v1
+          kind: ClusterDeployment
+          metadata:
+            name: $CLUSTER_NAME
+            namespace: $CLUSTER_NAME
+            labels:
+              cloud: $CLOUD_LABEL
+              region: $REGION
+              vendor: OpenShift
+              cluster.open-cluster-management.io/clusterset: 'default'
+          spec:
+            baseDomain: $BASE_DOMAIN
+            clusterName: $CLUSTER_NAME
+            installAttemptsLimit: 1
+            platform:
+              gcp:
+                credentialsSecretRef:
+                  name: gcp-creds
+                region: $REGION
+            provisioning:
+              installConfigSecretRef:
+                name: ${CLUSTER_NAME}-install-config
+              imageSetRef:
+                name: $VERSION
+            pullSecretRef:
+              name: global-pullsecret
+      EOF
+          ;;
+        Azure)
+          cat <<EOF | oc apply -f -
+          apiVersion: hive.openshift.io/v1
+          kind: ClusterDeployment
+          metadata:
+            name: $CLUSTER_NAME
+            namespace: $CLUSTER_NAME
+            labels:
+              cloud: $CLOUD_LABEL
+              region: $REGION
+              vendor: OpenShift
+              cluster.open-cluster-management.io/clusterset: 'default'
+          spec:
+            baseDomain: $BASE_DOMAIN
+            clusterName: $CLUSTER_NAME
+            installAttemptsLimit: 1
+            platform:
+              azure:
+                baseDomainResourceGroupName: $(params.azure-resource-group)
+                cloudName: AzurePublicCloud
+                credentialsSecretRef:
+                  name: azure-creds
+                region: $REGION
+            provisioning:
+              installConfigSecretRef:
+                name: ${CLUSTER_NAME}-install-config
+              imageSetRef:
+                name: $VERSION
+            pullSecretRef:
+              name: global-pullsecret
+      EOF
+          ;;
+        Amazon|AWS|*)
+          cat <<EOF | oc apply -f -
+          apiVersion: hive.openshift.io/v1
+          kind: ClusterDeployment
+          metadata:
+            name: $CLUSTER_NAME
+            namespace: $CLUSTER_NAME
+            labels:
+              cloud: $CLOUD_LABEL
+              region: $REGION
+              vendor: OpenShift
+              cluster.open-cluster-management.io/clusterset: 'default'
+          spec:
+            baseDomain: $BASE_DOMAIN
+            clusterName: $CLUSTER_NAME
+            installAttemptsLimit: 1
+            platform:
+              aws:
+                credentialsSecretRef:
+                  name: aws-creds
+                region: $REGION
+            provisioning:
+              installConfigSecretRef:
+                name: ${CLUSTER_NAME}-install-config
+              imageSetRef:
+                name: $VERSION
+            pullSecretRef:
+              name: global-pullsecret
+      EOF
+          ;;
+      esac
+      
+      echo "ClusterDeployment $CLUSTER_NAME created"

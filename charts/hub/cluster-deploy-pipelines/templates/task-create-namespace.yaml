@@ -1,0 +1,28 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: create-namespace
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Creates a namespace for the cluster deployment
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  steps:
+  - name: create-namespace
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      
+      # Check if namespace exists
+      if oc get namespace "$CLUSTER_NAME" &>/dev/null; then
+        echo "Namespace $CLUSTER_NAME already exists"
+      else
+        echo "Creating namespace $CLUSTER_NAME"
+        oc create namespace "$CLUSTER_NAME"
+      fi

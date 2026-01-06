@@ -1,0 +1,227 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: deploy-cluster
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Pipeline to deploy OpenShift clusters using ACM and Hive
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: base-domain
+    description: Base domain for the cluster
+    type: string
+  - name: cloud-provider
+    description: Cloud provider (Amazon, Google, or Azure)
+    type: string
+  - name: cloud-region
+    description: Cloud region
+    type: string
+  - name: cluster-version
+    description: Cluster version/image set
+    type: string
+  - name: cluster-group
+    description: Cluster group label
+    type: string
+    default: "devops"
+  - name: control-plane-replicas
+    description: Number of control plane replicas
+    type: string
+    default: "3"
+  - name: control-plane-machine-type
+    description: Control plane machine type
+    type: string
+  - name: worker-replicas
+    description: Number of worker replicas
+    type: string
+    default: "3"
+  - name: worker-machine-type
+    description: Worker machine type
+    type: string
+  - name: azure-resource-group
+    description: Azure base domain resource group name
+    type: string
+    default: ""
+  - name: gcp-project-id
+    description: GCP project ID
+    type: string
+    default: ""
+  - name: ssh-public-key
+    description: SSH public key
+    type: string
+    default: ""
+  - name: secret-store-name
+    description: Name of the ClusterSecretStore for External Secrets
+    type: string
+    default: "vault-backend"
+  - name: aws-creds-key-path
+    description: Vault path for AWS credentials
+    type: string
+    default: "secret/data/hub/aws"
+  - name: gcp-creds-key-path
+    description: Vault path for GCP credentials
+    type: string
+    default: "secret/data/hub/gcp"
+  - name: azure-creds-key-path
+    description: Vault path for Azure credentials
+    type: string
+    default: "secret/data/hub/azure"
+  - name: pullsecret-key-path
+    description: Vault path for pull secret
+    type: string
+    default: "pushsecrets/global-pull-secret"
+  - name: timeout-minutes
+    description: Timeout in minutes for cluster deployment
+    type: string
+    default: "90"
+  workspaces:
+  - name: install-config
+    description: Workspace for install-config.yaml
+  - name: kubeconfig
+    description: Workspace for kubeconfig
+  tasks:
+  - name: create-namespace
+    taskRef:
+      name: create-namespace
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+  
+  - name: create-externalsecrets
+    taskRef:
+      name: create-externalsecrets
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: cloud-provider
+      value: $(params.cloud-provider)
+    - name: secret-store-name
+      value: $(params.secret-store-name)
+    - name: aws-creds-key-path
+      value: $(params.aws-creds-key-path)
+    - name: gcp-creds-key-path
+      value: $(params.gcp-creds-key-path)
+    - name: azure-creds-key-path
+      value: $(params.azure-creds-key-path)
+    - name: pullsecret-key-path
+      value: $(params.pullsecret-key-path)
+    runAfter:
+    - create-namespace
+  
+  - name: create-install-config
+    taskRef:
+      name: create-install-config
+    workspaces:
+    - name: install-config
+      workspace: install-config
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: base-domain
+      value: $(params.base-domain)
+    - name: cloud-provider
+      value: $(params.cloud-provider)
+    - name: cloud-region
+      value: $(params.cloud-region)
+    - name: cluster-version
+      value: $(params.cluster-version)
+    - name: control-plane-replicas
+      value: $(params.control-plane-replicas)
+    - name: control-plane-machine-type
+      value: $(params.control-plane-machine-type)
+    - name: worker-replicas
+      value: $(params.worker-replicas)
+    - name: worker-machine-type
+      value: $(params.worker-machine-type)
+    - name: azure-resource-group
+      value: $(params.azure-resource-group)
+    - name: gcp-project-id
+      value: $(params.gcp-project-id)
+    - name: ssh-public-key
+      value: $(params.ssh-public-key)
+    runAfter:
+    - create-externalsecrets
+  
+  - name: create-cluster-deployment
+    taskRef:
+      name: create-cluster-deployment
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: base-domain
+      value: $(params.base-domain)
+    - name: cloud-provider
+      value: $(params.cloud-provider)
+    - name: cloud-region
+      value: $(params.cloud-region)
+    - name: cluster-version
+      value: $(params.cluster-version)
+    - name: azure-resource-group
+      value: $(params.azure-resource-group)
+    runAfter:
+    - create-install-config
+  
+  - name: create-machinepool
+    taskRef:
+      name: create-machinepool
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: cloud-provider
+      value: $(params.cloud-provider)
+    - name: worker-replicas
+      value: $(params.worker-replicas)
+    - name: worker-machine-type
+      value: $(params.worker-machine-type)
+    runAfter:
+    - create-cluster-deployment
+  
+  - name: wait-cluster-ready
+    taskRef:
+      name: wait-cluster-ready
+    workspaces:
+    - name: kubeconfig
+      workspace: kubeconfig
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: timeout-minutes
+      value: $(params.timeout-minutes)
+    runAfter:
+    - create-machinepool
+  
+  - name: create-managed-cluster
+    taskRef:
+      name: create-managed-cluster
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: cluster-group
+      value: $(params.cluster-group)
+    runAfter:
+    - wait-cluster-ready
+  
+  - name: create-import-secret
+    taskRef:
+      name: create-import-secret
+    workspaces:
+    - name: kubeconfig
+      workspace: kubeconfig
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    runAfter:
+    - create-managed-cluster
+  
+  - name: create-klusterlet-addon
+    taskRef:
+      name: create-klusterlet-addon
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: cluster-group
+      value: $(params.cluster-group)
+    runAfter:
+    - create-import-secret

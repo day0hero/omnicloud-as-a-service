@@ -1,0 +1,60 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: create-machinepool
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Creates MachinePool resource for AWS worker nodes
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: cloud-provider
+    description: Cloud provider (Amazon, Google, or Azure)
+    type: string
+  - name: worker-replicas
+    description: Number of worker replicas
+    type: string
+    default: "3"
+  - name: worker-machine-type
+    description: Worker machine type
+    type: string
+  steps:
+  - name: create-machinepool
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      PROVIDER=$(params.cloud-provider)
+      WORKER_REPLICAS=$(params.worker-replicas)
+      WORKER_MACHINE_TYPE=$(params.worker-machine-type)
+      
+      # MachinePools are only needed for AWS
+      if [ "$PROVIDER" != "Amazon" ] && [ "$PROVIDER" != "AWS" ]; then
+        echo "Skipping MachinePool creation for provider $PROVIDER (only needed for AWS)"
+        exit 0
+      fi
+      
+      cat <<EOF | oc apply -f -
+      apiVersion: hive.openshift.io/v1
+      kind: MachinePool
+      metadata:
+        name: ${CLUSTER_NAME}-worker
+        namespace: $CLUSTER_NAME
+      spec:
+        clusterDeploymentRef:
+          name: $CLUSTER_NAME
+        name: worker
+        replicas: $WORKER_REPLICAS
+        platform:
+          aws:
+            rootVolume:
+              size: 200
+              type: gp3
+            type: $WORKER_MACHINE_TYPE
+      EOF
+      
+      echo "MachinePool ${CLUSTER_NAME}-worker created"

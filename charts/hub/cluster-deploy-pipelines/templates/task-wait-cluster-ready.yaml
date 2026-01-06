@@ -1,0 +1,76 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: wait-cluster-ready
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Waits for cluster deployment to be ready and extracts kubeconfig
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: timeout-minutes
+    description: Timeout in minutes
+    type: string
+    default: "90"
+  workspaces:
+  - name: kubeconfig
+    description: Workspace to store kubeconfig
+  steps:
+  - name: wait-for-admin-kubeconfig
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      TIMEOUT=$(params.timeout-minutes)
+      
+      echo "Waiting for adminKubeconfigSecretRef to be populated..."
+      for i in $(seq 1 $((TIMEOUT * 60))); do
+        if oc get clusterdeployment $CLUSTER_NAME -n $CLUSTER_NAME -o jsonpath='{.spec.clusterMetadata.adminKubeconfigSecretRef.name}' 2>/dev/null | grep -q .; then
+          echo "adminKubeconfigSecretRef found"
+          break
+        fi
+        if [ $i -eq $((TIMEOUT * 60)) ]; then
+          echo "Timeout waiting for adminKubeconfigSecretRef"
+          exit 1
+        fi
+        sleep 1
+      done
+      
+      ADMIN_SECRET=$(oc get clusterdeployment $CLUSTER_NAME -n $CLUSTER_NAME -o jsonpath='{.spec.clusterMetadata.adminKubeconfigSecretRef.name}')
+      echo "Admin secret name: $ADMIN_SECRET"
+      
+      # Wait for the secret to exist
+      echo "Waiting for secret $ADMIN_SECRET to exist..."
+      for i in $(seq 1 $((TIMEOUT * 60))); do
+        if oc get secret $ADMIN_SECRET -n $CLUSTER_NAME &>/dev/null; then
+          echo "Secret $ADMIN_SECRET found"
+          break
+        fi
+        if [ $i -eq $((TIMEOUT * 60)) ]; then
+          echo "Timeout waiting for secret $ADMIN_SECRET"
+          exit 1
+        fi
+        sleep 1
+      done
+      
+      # Extract kubeconfig
+      oc get secret $ADMIN_SECRET -n $CLUSTER_NAME -o jsonpath='{.data.kubeconfig}' | base64 -d > $(workspaces.kubeconfig.path)/kubeconfig
+      echo "Kubeconfig extracted"
+      
+  - name: wait-for-installer-pod
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      TIMEOUT=$(params.timeout-minutes)
+      
+      echo "Waiting for installer pod to be Running..."
+      oc wait --for=condition=Ready pod -l hive.openshift.io/cluster-deployment-name=$CLUSTER_NAME -n $CLUSTER_NAME --timeout=${TIMEOUT}m || true
+      
+      echo "Installer pod is running"

@@ -1,0 +1,8 @@
+apiVersion: v2
+description: OpenShift Pipelines for cluster deployment using ACM and Hive
+keywords:
+- pattern
+- pipelines
+- tekton
+name: cluster-deploy-pipelines
+version: 0.1.0

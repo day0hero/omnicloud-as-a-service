@@ -1,0 +1,57 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata: 
+  name: deploy-cluster-my-azure-cluster
+  namespace: openshift-pipelines
+spec:
+  pipelineRef:
+    name: deploy-cluster
+  serviceAccountName: cluster-deploy-pipelines-sa
+  params:
+  - name: cluster-name
+    value: "my-azure-cluster"
+  - name: base-domain
+    value: "example.com"
+  - name: cloud-provider
+    value: "Azure"
+  - name: cloud-region
+    value: "eastus"
+  - name: cluster-version
+    value: "img4.19.9-x86-64-appsub"
+  - name: control-plane-machine-type
+    value: "Standard_D8s_v3"
+  - name: worker-machine-type
+    value: "Standard_D16s_v3"
+  - name: cluster-group
+    value: "devops"
+  - name: control-plane-replicas
+    value: "3"
+  - name: worker-replicas
+    value: "3"
+  - name: azure-resource-group
+    value: "my-resource-group"
+  - name: secret-store-name
+    value: "vault-backend"
+  - name: azure-creds-key-path
+    value: "secret/data/hub/azure"
+  - name: pullsecret-key-path
+    value: "pushsecrets/global-pull-secret"
+  - name: timeout-minutes
+    value: "90"
+  workspaces:
+  - name: install-config
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  - name: kubeconfig
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

@@ -1,0 +1,21 @@
+# Default values for cluster-deploy-pipelines
+serviceAccount:
+  name: cluster-deploy-pipelines-sa
+  namespace: openshift-pipelines
+
+# Image for tasks that need kubectl/oc
+kubectlImage: quay.io/openshift/origin-cli:latest
+
+# External Secrets Operator configuration
+externalSecrets:
+  secretStore:
+    name: vault-backend
+    kind: ClusterSecretStore
+  awsCreds:
+    key: secret/data/hub/aws
+  gcpCreds:
+    key: secret/data/hub/gcp
+  azureCreds:
+    key: secret/data/hub/azure
+  pullSecret:
+    key: pushsecrets/global-pull-secret

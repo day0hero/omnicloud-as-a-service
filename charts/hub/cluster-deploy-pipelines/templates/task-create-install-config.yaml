@@ -1,0 +1,209 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: create-install-config
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Creates install-config secret for cluster deployment
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: base-domain
+    description: Base domain for the cluster
+    type: string
+  - name: cloud-provider
+    description: Cloud provider (Amazon, Google, or Azure)
+    type: string
+  - name: cloud-region
+    description: Cloud region
+    type: string
+  - name: cluster-version
+    description: Cluster version/image set
+    type: string
+  - name: control-plane-replicas
+    description: Number of control plane replicas
+    type: string
+    default: "3"
+  - name: control-plane-machine-type
+    description: Control plane machine type
+    type: string
+  - name: worker-replicas
+    description: Number of worker replicas
+    type: string
+    default: "3"
+  - name: worker-machine-type
+    description: Worker machine type
+    type: string
+  - name: azure-resource-group
+    description: Azure base domain resource group name
+    type: string
+    default: ""
+  - name: gcp-project-id
+    description: GCP project ID
+    type: string
+    default: ""
+  - name: ssh-public-key
+    description: SSH public key
+    type: string
+    default: ""
+  workspaces:
+  - name: install-config
+    description: Workspace for install-config.yaml
+  steps:
+  - name: generate-install-config
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      BASE_DOMAIN=$(params.base-domain)
+      PROVIDER=$(params.cloud-provider)
+      REGION=$(params.cloud-region)
+      CP_REPLICAS=$(params.control-plane-replicas)
+      CP_MACHINE_TYPE=$(params.control-plane-machine-type)
+      WORKER_REPLICAS=$(params.worker-replicas)
+      WORKER_MACHINE_TYPE=$(params.worker-machine-type)
+      AZURE_RG=$(params.azure-resource-group)
+      GCP_PROJECT=$(params.gcp-project-id)
+      SSH_KEY=$(params.ssh-public-key)
+      
+      # Generate install-config.yaml
+      cat > $(workspaces.install-config.path)/install-config.yaml <<EOF
+      apiVersion: v1
+      metadata:
+        name: $CLUSTER_NAME
+      baseDomain: $BASE_DOMAIN
+      controlPlane:
+        architecture: amd64
+        hyperthreading: Enabled
+        name: master
+        replicas: $CP_REPLICAS
+        platform:
+      EOF
+      
+      case "$PROVIDER" in
+        Azure)
+          cat >> $(workspaces.install-config.path)/install-config.yaml <<EOF
+          azure:
+            osDisk:
+              diskSizeGB: 200
+            type: $CP_MACHINE_TYPE
+      compute:
+      - architecture: amd64
+        hyperthreading: Enabled
+        name: worker
+        replicas: $WORKER_REPLICAS
+        platform:
+          azure:
+            osDisk:
+              diskSizeGB: 200
+            type: $WORKER_MACHINE_TYPE
+      networking:
+        networkType: OVNKubernetes
+        clusterNetwork:
+        - cidr: 10.128.0.0/14
+          hostPrefix: 23
+        machineNetwork:
+        - cidr: 10.0.0.0/16
+        serviceNetwork:
+        - 172.30.0.0/16
+      platform:
+        azure:
+          cloudName: AzurePublicCloud
+          baseDomainResourceGroupName: $AZURE_RG
+          region: $REGION
+      EOF
+          ;;
+        Google|GCP)
+          cat >> $(workspaces.install-config.path)/install-config.yaml <<EOF
+          gcp:
+            type: $CP_MACHINE_TYPE
+      compute:
+      - architecture: amd64
+        hyperthreading: Enabled
+        name: worker
+        replicas: $WORKER_REPLICAS
+        platform:
+          gcp:
+            type: $WORKER_MACHINE_TYPE
+      networking:
+        networkType: OVNKubernetes
+        clusterNetwork:
+        - cidr: 10.128.0.0/14
+          hostPrefix: 23
+        machineNetwork:
+        - cidr: 10.0.0.0/16
+        serviceNetwork:
+        - 172.30.0.0/16
+      platform:
+        gcp:
+          projectID: $GCP_PROJECT
+          region: $REGION
+      EOF
+          ;;
+        Amazon|AWS|*)
+          cat >> $(workspaces.install-config.path)/install-config.yaml <<EOF
+          aws:
+            rootVolume:
+              size: 200
+              type: gp3
+            type: $CP_MACHINE_TYPE
+      compute:
+      - architecture: amd64
+        hyperthreading: Enabled
+        name: worker
+        replicas: $WORKER_REPLICAS
+        platform:
+          aws:
+            rootVolume:
+              size: 200
+              type: gp3
+            type: $WORKER_MACHINE_TYPE
+      networking:
+        networkType: OVNKubernetes
+        clusterNetwork:
+        - cidr: 10.128.0.0/14
+          hostPrefix: 23
+        machineNetwork:
+        - cidr: 10.0.0.0/16
+        serviceNetwork:
+        - 172.30.0.0/16
+      platform:
+        aws:
+          region: $REGION
+      EOF
+          ;;
+      esac
+      
+      if [ -n "$SSH_KEY" ]; then
+        cat >> $(workspaces.install-config.path)/install-config.yaml <<EOF
+      pullSecret: ""
+      sshKey: |-
+        $SSH_KEY
+      EOF
+      else
+        cat >> $(workspaces.install-config.path)/install-config.yaml <<EOF
+      pullSecret: ""
+      sshKey: ""
+      EOF
+      fi
+      
+      echo "Generated install-config.yaml"
+      cat $(workspaces.install-config.path)/install-config.yaml
+      
+  - name: create-install-config-secret
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      INSTALL_CONFIG=$(cat $(workspaces.install-config.path)/install-config.yaml | base64 -w 0)
+      
+      oc create secret generic ${CLUSTER_NAME}-install-config \
+        --from-file=install-config.yaml=$(workspaces.install-config.path)/install-config.yaml \
+        -n $CLUSTER_NAME \
+        --dry-run=client -o yaml | oc apply -f -
