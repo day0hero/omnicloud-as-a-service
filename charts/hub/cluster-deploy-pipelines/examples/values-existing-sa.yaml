@@ -1,0 +1,38 @@
+# Example values.yaml for using an existing ServiceAccount
+# This configuration binds an existing ServiceAccount (e.g., "pipeline" in "hive" namespace)
+# to the ClusterRole without creating a new ServiceAccount
+
+serviceAccount:
+  # Don't create a new ServiceAccount, use existing one(s)
+  create: false
+  name: cluster-deploy-pipelines-sa  # Not used when create: false, but kept for reference
+  namespace: openshift-pipelines  # Not used when create: false, but kept for reference
+  # Bind existing ServiceAccounts to ClusterRole
+  additionalNamespaces:
+    - namespace: hive
+      name: pipeline  # Existing ServiceAccount name in hive namespace
+
+# Rest of the configuration remains the same
+kubectlImage: quay.io/openshift/origin-cli:latest
+
+externalSecrets:
+  secretStore:
+    name: vault-backend
+    kind: ClusterSecretStore
+  awsCreds:
+    key: secret/data/hub/aws
+  gcpCreds:
+    key: secret/data/hub/gcp
+  azureCreds:
+    key: secret/data/hub/azure
+  pullSecret:
+    key: pushsecrets/global-pull-secret
+
+workspaces:
+  createPVCs: false
+  installConfig:
+    storageSize: 1Gi
+    storageClassName: ""
+  kubeconfig:
+    storageSize: 1Gi
+    storageClassName: ""

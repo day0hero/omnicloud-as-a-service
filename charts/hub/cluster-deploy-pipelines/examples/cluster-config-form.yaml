@@ -16,7 +16,7 @@ data:
   base-domain: ""   # e.g., "example.com"
   cloud-provider: ""  # One of: Amazon, Google, Azure
   cloud-region: ""    # e.g., "us-east-1", "us-central1", "eastus"
-  cluster-version: ""  # e.g., "img4.19.9-x86-64-appsub" (check with: oc get clusterimageset)
+  cluster-version: "img4.20.8-x86-64-appsub"  # Default image set (check with: oc get clusterimageset)
   control-plane-machine-type: ""  # e.g., "m5.xlarge" (AWS), "n1-standard-4" (GCP), "Standard_D8s_v3" (Azure)
   worker-machine-type: ""         # e.g., "m5.4xlarge" (AWS), "n1-standard-8" (GCP), "Standard_D16s_v3" (Azure)
   
@@ -33,3 +33,4 @@ data:
   azure-creds-key-path: "secret/data/hub/azure"  # Vault path for Azure (if using Azure)
   pullsecret-key-path: "pushsecrets/global-pull-secret"  # Vault path for pull secret
   timeout-minutes: "90"
+  service-account-name: "cluster-deploy-pipelines-sa"  # ServiceAccount to use for PipelineRun

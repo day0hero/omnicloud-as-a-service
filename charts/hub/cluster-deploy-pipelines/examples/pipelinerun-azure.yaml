@@ -17,7 +17,7 @@ spec:
   - name: cloud-region
     value: "eastus"
   - name: cluster-version
-    value: "img4.19.9-x86-64-appsub"
+    value: "img4.20.8-x86-64-appsub"
   - name: control-plane-machine-type
     value: "Standard_D8s_v3"
   - name: worker-machine-type
@@ -29,7 +29,7 @@ spec:
   - name: worker-replicas
     value: "3"
   - name: azure-resource-group
-    value: "my-resource-group"
+    value: ""
   - name: secret-store-name
     value: "vault-backend"
   - name: azure-creds-key-path

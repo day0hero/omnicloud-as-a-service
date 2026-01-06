@@ -1,0 +1,38 @@
+# Example Cluster Configuration ConfigMap for Azure
+# This shows an Azure-specific example
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-config-form-azure-example
+  namespace: openshift-pipelines
+  annotations:
+    trigger.tekton.dev/pipeline: deploy-cluster
+data:
+  # Required Configuration
+  cluster-name: "my-azure-cluster"
+  base-domain: "example.com"
+  cloud-provider: "Azure"
+  cloud-region: "eastus"
+  cluster-version: "img4.20.8-x86-64-appsub"
+  control-plane-machine-type: "Standard_D8s_v3"  # Azure machine type
+  worker-machine-type: "Standard_D16s_v3"  # Azure machine type
+  
+  # Optional Configuration
+  cluster-group: "devops"
+  control-plane-replicas: "3"
+  worker-replicas: "3"
+  azure-resource-group: ""  # Required for Azure (set to your Azure resource group name)
+  gcp-project-id: ""  # Not needed for Azure
+  ssh-public-key: ""
+  
+  # External Secrets Configuration
+  secret-store-name: "vault-backend"
+  aws-creds-key-path: "secret/data/hub/aws"
+  gcp-creds-key-path: "secret/data/hub/gcp"
+  azure-creds-key-path: "secret/data/hub/azure"
+  pullsecret-key-path: "pushsecrets/global-pull-secret"
+  
+  # Pipeline Configuration
+  timeout-minutes: "90"
+  service-account-name: "cluster-deploy-pipelines-sa"  # ServiceAccount to use for PipelineRun

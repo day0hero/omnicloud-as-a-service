@@ -1,0 +1,40 @@
+# Example Cluster Configuration ConfigMap
+# This is a filled-out example showing how to configure a cluster deployment
+# Copy this file and modify the values for your cluster
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-config-form-example
+  namespace: openshift-pipelines
+  annotations:
+    # This annotation can be used by a webhook or automation to trigger PipelineRun
+    trigger.tekton.dev/pipeline: deploy-cluster
+data:
+  # Required Configuration
+  cluster-name: "my-example-cluster"
+  base-domain: "example.com"
+  cloud-provider: "Amazon"  # One of: Amazon, Google, Azure
+  cloud-region: "us-east-1"  # e.g., "us-east-1", "us-central1", "eastus"
+  cluster-version: "img4.20.8-x86-64-appsub"  # Default image set (check available versions with: oc get clusterimageset)
+  control-plane-machine-type: "m5.xlarge"  # AWS example
+  worker-machine-type: "m5.4xlarge"  # AWS example
+  
+  # Optional Configuration
+  cluster-group: "devops"
+  control-plane-replicas: "3"
+  worker-replicas: "3"
+  azure-resource-group: ""  # Required for Azure deployments (leave empty/null if not using Azure)
+  gcp-project-id: ""        # Required for GCP deployments (leave empty/null if not using GCP)
+  ssh-public-key: ""        # Optional SSH public key (leave empty if not needed)
+  
+  # External Secrets Configuration
+  secret-store-name: "vault-backend"
+  aws-creds-key-path: "secret/data/hub/aws"
+  gcp-creds-key-path: "secret/data/hub/gcp"
+  azure-creds-key-path: "secret/data/hub/azure"
+  pullsecret-key-path: "pushsecrets/global-pull-secret"
+  
+  # Pipeline Configuration
+  timeout-minutes: "90"
+  service-account-name: "cluster-deploy-pipelines-sa"  # ServiceAccount to use for PipelineRun

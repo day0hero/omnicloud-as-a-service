@@ -1,0 +1,41 @@
+# Example values.yaml for using ServiceAccount in hive namespace
+# This configuration adds the ServiceAccount from hive namespace to the ClusterRoleBinding
+# so it can create namespaces and manage cluster resources
+
+serviceAccount:
+  create: true
+  name: cluster-deploy-pipelines-sa
+  namespace: openshift-pipelines  # Primary namespace where ServiceAccount is created
+  # Add hive namespace so ServiceAccount there also gets ClusterRole permissions
+  # If you have a different ServiceAccount name in hive, specify it:
+  # additionalNamespaces:
+  #   - namespace: hive
+  #     name: pipeline
+  additionalNamespaces:
+    - namespace: hive
+      name: pipeline  # ServiceAccount name in hive namespace
+
+# Rest of the configuration remains the same
+kubectlImage: quay.io/openshift/origin-cli:latest
+
+externalSecrets:
+  secretStore:
+    name: vault-backend
+    kind: ClusterSecretStore
+  awsCreds:
+    key: secret/data/hub/aws
+  gcpCreds:
+    key: secret/data/hub/gcp
+  azureCreds:
+    key: secret/data/hub/azure
+  pullSecret:
+    key: pushsecrets/global-pull-secret
+
+workspaces:
+  createPVCs: false
+  installConfig:
+    storageSize: 1Gi
+    storageClassName: ""
+  kubeconfig:
+    storageSize: 1Gi
+    storageClassName: ""

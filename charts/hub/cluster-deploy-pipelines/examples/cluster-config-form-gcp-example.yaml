@@ -1,0 +1,38 @@
+# Example Cluster Configuration ConfigMap for GCP
+# This shows a GCP-specific example
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-config-form-gcp-example
+  namespace: openshift-pipelines
+  annotations:
+    trigger.tekton.dev/pipeline: deploy-cluster
+data:
+  # Required Configuration
+  cluster-name: "my-gcp-cluster"
+  base-domain: "example.com"
+  cloud-provider: "Google"  # Use "Google" for GCP
+  cloud-region: "us-central1"
+  cluster-version: "img4.20.8-x86-64-appsub"
+  control-plane-machine-type: "n1-standard-4"  # GCP machine type
+  worker-machine-type: "n1-standard-8"  # GCP machine type
+  
+  # Optional Configuration
+  cluster-group: "devops"
+  control-plane-replicas: "3"
+  worker-replicas: "3"
+  gcp-project-id: ""  # Required for GCP (set to your GCP project ID)
+  azure-resource-group: ""  # Not needed for GCP
+  ssh-public-key: ""
+  
+  # External Secrets Configuration
+  secret-store-name: "vault-backend"
+  aws-creds-key-path: "secret/data/hub/aws"
+  gcp-creds-key-path: "secret/data/hub/gcp"
+  azure-creds-key-path: "secret/data/hub/azure"
+  pullsecret-key-path: "pushsecrets/global-pull-secret"
+  
+  # Pipeline Configuration
+  timeout-minutes: "90"
+  service-account-name: "cluster-deploy-pipelines-sa"  # ServiceAccount to use for PipelineRun

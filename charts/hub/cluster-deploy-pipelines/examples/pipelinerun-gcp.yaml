@@ -17,7 +17,7 @@ spec:
   - name: cloud-region
     value: "us-central1"
   - name: cluster-version
-    value: "img4.19.9-x86-64-appsub"
+    value: "img4.20.8-x86-64-appsub"
   - name: control-plane-machine-type
     value: "n1-standard-4"
   - name: worker-machine-type
@@ -29,7 +29,7 @@ spec:
   - name: worker-replicas
     value: "3"
   - name: gcp-project-id
-    value: "my-gcp-project-id"
+    value: ""
   - name: secret-store-name
     value: "vault-backend"
   - name: gcp-creds-key-path
