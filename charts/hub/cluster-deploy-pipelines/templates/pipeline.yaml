@@ -22,6 +22,7 @@ spec:
   - name: cluster-version
     description: Cluster version/image set
     type: string
+    default: "img4.20.8-x86-64-appsub"
   - name: cluster-group
     description: Cluster group label
     type: string

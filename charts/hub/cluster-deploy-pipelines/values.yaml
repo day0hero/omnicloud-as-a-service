@@ -1,10 +1,16 @@
 # Default values for cluster-deploy-pipelines
 serviceAccount:
+  # Set to false if you want to use an existing ServiceAccount instead of creating one
+  create: true
   name: cluster-deploy-pipelines-sa
   namespace: openshift-pipelines
-  # Additional namespaces where the same ServiceAccount name exists and should be bound to ClusterRole
-  # This is useful if you have the ServiceAccount in multiple namespaces (e.g., hive, openshift-pipelines)
-  # Example: additionalNamespaces: ["hive"]
+  # Additional namespaces where ServiceAccounts should be bound to ClusterRole
+  # This is useful if you have ServiceAccounts in multiple namespaces that need the same permissions
+  # Each entry can specify a different ServiceAccount name if needed
+  # Example: 
+  #   additionalNamespaces:
+  #     - namespace: hive
+  #       name: pipeline  # Optional: if different from serviceAccount.name
   additionalNamespaces: []
 
 # Image for tasks that need kubectl/oc
