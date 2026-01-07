@@ -1,0 +1,74 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: destroy-cluster
+  namespace: {{ .Values.pipelineNamespace }}
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Pipeline to destroy/delete a provisioned OpenShift cluster
+  params:
+  - name: cluster-name
+    description: Name of the cluster to destroy
+    type: string
+  - name: timeout-minutes
+    description: Timeout in minutes for resource deletion
+    type: string
+    default: "20"
+  - name: delete-namespace
+    description: Delete the cluster namespace (set to false to keep namespace)
+    type: string
+    default: "true"
+  workspaces:
+  - name: namespace-info
+    description: Workspace to share namespace information between tasks
+  tasks:
+  - name: find-cluster-deployment
+    taskRef:
+      name: find-cluster-deployment
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    workspaces:
+    - name: output
+      workspace: namespace-info
+  
+  - name: delete-cluster-deployment
+    taskRef:
+      name: delete-cluster-deployment
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: cluster-namespace
+      value: $(tasks.find-cluster-deployment.results.cluster-namespace)
+    - name: timeout-minutes
+      value: $(params.timeout-minutes)
+    workspaces:
+    - name: namespace-info
+      workspace: namespace-info
+    runAfter:
+    - find-cluster-deployment
+  
+  - name: delete-managed-cluster
+    taskRef:
+      name: delete-managed-cluster
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: timeout-minutes
+      value: $(params.timeout-minutes)
+    runAfter:
+    - delete-cluster-deployment
+  
+  - name: cleanup-cluster-resources
+    taskRef:
+      name: cleanup-cluster-resources
+    params:
+    - name: cluster-name
+      value: $(params.cluster-name)
+    - name: cluster-namespace
+      value: $(tasks.find-cluster-deployment.results.cluster-namespace)
+    - name: delete-namespace
+      value: $(params.delete-namespace)
+    runAfter:
+    - delete-managed-cluster

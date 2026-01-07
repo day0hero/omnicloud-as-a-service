@@ -1,0 +1,50 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: find-cluster-deployment
+  namespace: {{ .Values.pipelineNamespace }}
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Finds ClusterDeployment namespace (cluster namespace or hive namespace)
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  results:
+  - name: cluster-namespace
+    description: Namespace where ClusterDeployment was found
+  workspaces:
+  - name: output
+    description: Workspace to write namespace information
+  steps:
+  - name: find-cluster-deployment-namespace
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      
+      echo "Finding ClusterDeployment $CLUSTER_NAME..."
+      
+      # Try cluster namespace first
+      if oc get clusterdeployment "$CLUSTER_NAME" -n "$CLUSTER_NAME" &>/dev/null; then
+        CLUSTER_NAMESPACE="$CLUSTER_NAME"
+        echo "Found ClusterDeployment in namespace: $CLUSTER_NAMESPACE"
+      # Try hive namespace
+      elif oc get clusterdeployment "$CLUSTER_NAME" -n hive &>/dev/null; then
+        CLUSTER_NAMESPACE="hive"
+        echo "Found ClusterDeployment in namespace: $CLUSTER_NAMESPACE"
+      else
+        echo "Warning: ClusterDeployment $CLUSTER_NAME not found in $CLUSTER_NAME or hive namespace"
+        echo "Assuming namespace: $CLUSTER_NAME"
+        CLUSTER_NAMESPACE="$CLUSTER_NAME"
+      fi
+      
+      # Save namespace for next tasks
+      echo "$CLUSTER_NAMESPACE" > $(workspaces.output.path)/cluster-namespace.txt
+      echo "Cluster namespace: $CLUSTER_NAMESPACE"
+      
+      # Also output as result for pipeline
+      echo -n "$CLUSTER_NAMESPACE" > $(results.cluster-namespace.path)

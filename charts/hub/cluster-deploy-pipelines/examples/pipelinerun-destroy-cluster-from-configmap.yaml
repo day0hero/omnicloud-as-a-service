@@ -1,0 +1,20 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: destroy-cluster-from-configmap
+  namespace: openshift-pipelines
+spec:
+  pipelineRef:
+    name: destroy-cluster
+  serviceAccountName: pipeline
+  params:
+  # Extract cluster-name from ConfigMap
+  - name: cluster-name
+    value: "my-cluster"  # Or use a script to extract from ConfigMap
+  - name: timeout-minutes
+    value: "30"
+  - name: delete-namespace
+    value: "true"
+  workspaces:
+  - name: namespace-info
+    emptyDir: {}

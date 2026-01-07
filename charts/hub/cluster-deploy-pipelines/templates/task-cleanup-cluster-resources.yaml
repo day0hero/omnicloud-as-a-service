@@ -1,0 +1,82 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cleanup-cluster-resources
+  namespace: {{ .Values.pipelineNamespace }}
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Cleans up cluster-related resources (secrets, externalsecrets, namespace)
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: cluster-namespace
+    description: Namespace to clean up
+    type: string
+  - name: delete-namespace
+    description: Delete the cluster namespace (set to false for hive namespace)
+    type: string
+    default: "true"
+  steps:
+  - name: cleanup-resources
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      CLUSTER_NAMESPACE=$(params.cluster-namespace)
+      DELETE_NAMESPACE=$(params.delete-namespace)
+      
+      echo "Cleaning up resources for cluster $CLUSTER_NAME in namespace $CLUSTER_NAMESPACE"
+      
+      # Skip if namespace is hive
+      if [ "$CLUSTER_NAMESPACE" = "hive" ]; then
+        echo "Skipping namespace deletion (hive namespace)"
+        DELETE_NAMESPACE="false"
+      fi
+      
+      # Delete ExternalSecrets
+      echo "Deleting ExternalSecrets..."
+      oc delete externalsecrets -n "$CLUSTER_NAMESPACE" --all --ignore-not-found=true || true
+      
+      # Delete secrets (except system secrets)
+      echo "Deleting cluster secrets..."
+      oc delete secrets -n "$CLUSTER_NAMESPACE" \
+        --field-selector metadata.name!=default-token \
+        --ignore-not-found=true || true
+      
+      # Delete MachinePool if exists
+      echo "Deleting MachinePool..."
+      oc delete machinepool -n "$CLUSTER_NAMESPACE" --all --ignore-not-found=true || true
+      
+      # Delete KlusterletAddonConfig if exists
+      echo "Deleting KlusterletAddonConfig..."
+      oc delete klusterletaddonconfig "$CLUSTER_NAME" --ignore-not-found=true || true
+      
+      # Delete namespace if requested and not hive
+      if [ "$DELETE_NAMESPACE" = "true" ] && [ "$CLUSTER_NAMESPACE" != "hive" ]; then
+        echo "Deleting namespace $CLUSTER_NAMESPACE..."
+        
+        # Wait for finalizers to complete
+        oc delete namespace "$CLUSTER_NAMESPACE" --wait=false || true
+        
+        # Wait for namespace deletion
+        echo "Waiting for namespace deletion..."
+        for i in {1..60}; do
+          if ! oc get namespace "$CLUSTER_NAMESPACE" &>/dev/null; then
+            echo "Namespace $CLUSTER_NAMESPACE deleted successfully"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo "Warning: Namespace still exists after 10 minutes"
+            echo "It may have finalizers preventing deletion"
+          fi
+          sleep 10
+        done
+      else
+        echo "Skipping namespace deletion"
+      fi
+      
+      echo "Cleanup completed"

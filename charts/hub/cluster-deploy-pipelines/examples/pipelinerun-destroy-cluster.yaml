@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: destroy-cluster-example
+  namespace: openshift-pipelines
+spec:
+  pipelineRef:
+    name: destroy-cluster
+  serviceAccountName: pipeline
+  params:
+  - name: cluster-name
+    value: "my-cluster"  # Replace with your cluster name
+  - name: timeout-minutes
+    value: "20"  # Timeout for resource deletion
+  - name: delete-namespace
+    value: "true"  # Set to false to keep the namespace
+  workspaces:
+  - name: namespace-info
+    emptyDir: {}

@@ -1,0 +1,67 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: delete-cluster-deployment
+  namespace: {{ .Values.pipelineNamespace }}
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Deletes ClusterDeployment and waits for deletion
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: cluster-namespace
+    description: Namespace where ClusterDeployment exists
+    type: string
+  - name: timeout-minutes
+    description: Timeout in minutes for deletion
+    type: string
+    default: "20"
+  workspaces:
+  - name: namespace-info
+    description: Workspace containing namespace information
+  steps:
+  - name: delete-cluster-deployment
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      CLUSTER_NAMESPACE=$(params.cluster-namespace)
+      TIMEOUT_MINUTES=$(params.timeout-minutes)
+      
+      echo "Deleting ClusterDeployment $CLUSTER_NAME from namespace $CLUSTER_NAMESPACE"
+      
+      # Check if ClusterDeployment exists
+      if ! oc get clusterdeployment "$CLUSTER_NAME" -n "$CLUSTER_NAMESPACE" &>/dev/null; then
+        echo "ClusterDeployment $CLUSTER_NAME not found in namespace $CLUSTER_NAMESPACE"
+        echo "Skipping deletion"
+        exit 0
+      fi
+      
+      # Delete ClusterDeployment
+      oc delete clusterdeployment "$CLUSTER_NAME" -n "$CLUSTER_NAMESPACE" --wait=false || true
+      
+      echo "ClusterDeployment deletion initiated"
+      
+      # Wait for deletion
+      echo "Waiting for ClusterDeployment to be deleted (timeout: ${TIMEOUT_MINUTES} minutes)..."
+      TIMEOUT_SECONDS=$((TIMEOUT_MINUTES * 60))
+      ELAPSED=0
+      INTERVAL=10
+      
+      while [ $ELAPSED -lt $TIMEOUT_SECONDS ]; do
+        if ! oc get clusterdeployment "$CLUSTER_NAME" -n "$CLUSTER_NAMESPACE" &>/dev/null; then
+          echo "ClusterDeployment $CLUSTER_NAME deleted successfully"
+          exit 0
+        fi
+        
+        echo "Waiting for deletion... (elapsed: ${ELAPSED}s)"
+        sleep $INTERVAL
+        ELAPSED=$((ELAPSED + INTERVAL))
+      done
+      
+      echo "Warning: Timeout waiting for ClusterDeployment deletion"
+      echo "ClusterDeployment may still be deleting in the background"

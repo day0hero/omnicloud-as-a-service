@@ -1,0 +1,60 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: delete-managed-cluster
+  namespace: {{ .Values.pipelineNamespace }}
+  labels:
+    {{- include "cluster-deploy-pipelines.labels" . | nindent 4 }}
+spec:
+  description: Deletes ManagedCluster and waits for deletion
+  params:
+  - name: cluster-name
+    description: Name of the cluster
+    type: string
+  - name: timeout-minutes
+    description: Timeout in minutes for deletion
+    type: string
+    default: "20"
+  steps:
+  - name: delete-managed-cluster
+    image: {{ .Values.kubectlImage }}
+    script: |
+      #!/bin/bash
+      set -e
+      
+      CLUSTER_NAME=$(params.cluster-name)
+      TIMEOUT_MINUTES=$(params.timeout-minutes)
+      
+      echo "Deleting ManagedCluster $CLUSTER_NAME"
+      
+      # Check if ManagedCluster exists
+      if ! oc get managedcluster "$CLUSTER_NAME" &>/dev/null; then
+        echo "ManagedCluster $CLUSTER_NAME not found"
+        echo "Skipping deletion"
+        exit 0
+      fi
+      
+      # Delete ManagedCluster
+      oc delete managedcluster "$CLUSTER_NAME" --wait=false || true
+      
+      echo "ManagedCluster deletion initiated"
+      
+      # Wait for deletion
+      echo "Waiting for ManagedCluster to be deleted (timeout: ${TIMEOUT_MINUTES} minutes)..."
+      TIMEOUT_SECONDS=$((TIMEOUT_MINUTES * 60))
+      ELAPSED=0
+      INTERVAL=10
+      
+      while [ $ELAPSED -lt $TIMEOUT_SECONDS ]; do
+        if ! oc get managedcluster "$CLUSTER_NAME" &>/dev/null; then
+          echo "ManagedCluster $CLUSTER_NAME deleted successfully"
+          exit 0
+        fi
+        
+        echo "Waiting for deletion... (elapsed: ${ELAPSED}s)"
+        sleep $INTERVAL
+        ELAPSED=$((ELAPSED + INTERVAL))
+      done
+      
+      echo "Warning: Timeout waiting for ManagedCluster deletion"
+      echo "ManagedCluster may still be deleting in the background"
