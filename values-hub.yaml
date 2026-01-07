@@ -30,9 +30,14 @@ clusterGroup:
         env:
         - name: ROLEARN
           value: arn:aws:iam::296267305927:role/hypershift_cli_role
+    rhdh:
+      name: rhdh-operator
+      namespace: rhdh-operator
+      channel: fast
   argoProjects:
     - hub
     - infrastructure
+    - platform
   sharedValueFiles:
     - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
     - '/overrides/values-{{ $.Values.global.clusterVersion }}-{{ $.Values.clusterGroup.name }}.yaml'
