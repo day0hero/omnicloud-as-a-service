@@ -9,6 +9,7 @@ clusterGroup:
     - vault
     - group-sync-operator
     - openshift-pipelines
+    - rhdh-operator
   subscriptions:
     acm:
       name: advanced-cluster-management
@@ -31,9 +32,13 @@ clusterGroup:
         - name: ROLEARN
           value: arn:aws:iam::296267305927:role/hypershift_cli_role
     rhdh:
-      name: rhdh-operator
+      name: rhdh
       namespace: rhdh-operator
       channel: fast
+      config:
+        env:
+        - name: ROLEARN
+          value: arn:aws:iam::296267305927:role/hypershift_cli_role
   argoProjects:
     - hub
     - infrastructure
