@@ -1,0 +1,201 @@
+# Deploy baremetal cluster using ACM Assisted Installer
+# Flow: Namespace -> Secrets -> AgentClusterInstall -> ClusterDeployment ->
+#       InfraEnv -> NMStateConfig (per host) -> BareMetalHost (per host) ->
+#       Wait for agents -> ManagedCluster -> auto-import -> KlusterletAddonConfig
+
+- name: Check if the namespace exists
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: "{{ cluster.name }}"
+  register: namespace_check
+  ignore_errors: true
+
+- name: Create namespace if it doesn't exist
+  kubernetes.core.k8s:
+    name: "{{ cluster.name }}"
+    api_version: v1
+    kind: Namespace
+    state: present
+  when: namespace_check.resources | length == 0
+
+- name: Create BMC credential secrets (shared mode)
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ baremetal.bmcSharedSecretName }}"
+        namespace: "{{ cluster.name }}"
+      type: Opaque
+      data:
+        username: "{{ bmc_shared_username | default('admin') | b64encode }}"
+        password: "{{ bmc_shared_password | b64encode }}"
+  when:
+    - baremetal.bmcCredentialsMode == 'shared'
+    - user_provided_credentials | default(false)
+
+- name: Create BMC credential secrets (per-host mode)
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ item.bmc.credentialsName | default('bmc-secret-' + item.name) }}"
+        namespace: "{{ cluster.name }}"
+      type: Opaque
+      data:
+        username: "{{ item.bmc.username | b64encode }}"
+        password: "{{ item.bmc.password | b64encode }}"
+  loop: "{{ baremetal.hosts }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - baremetal.bmcCredentialsMode == 'perHost'
+    - user_provided_credentials | default(false)
+
+- name: Generate AgentClusterInstall template
+  ansible.builtin.template:
+    src: agentClusterInstall.yaml.j2
+    dest: "{{ deployment_config_dir }}/agentClusterInstall.yaml"
+    mode: "0644"
+
+- name: Create AgentClusterInstall resource
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'agentClusterInstall.yaml.j2') | from_yaml }}"
+
+- name: Generate ClusterDeployment template
+  ansible.builtin.template:
+    src: clusterDeployment.yaml.j2
+    dest: "{{ deployment_config_dir }}/clusterdeployment.yaml"
+    mode: "0644"
+
+- name: Create ClusterDeployment resource
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'clusterDeployment.yaml.j2') | from_yaml }}"
+
+- name: Generate InfraEnv template
+  ansible.builtin.template:
+    src: infraEnv.yaml.j2
+    dest: "{{ deployment_config_dir }}/infraEnv.yaml"
+    mode: "0644"
+
+- name: Create InfraEnv resource
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'infraEnv.yaml.j2') | from_yaml }}"
+
+- name: Create NMStateConfig for hosts with static networking
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'nmStateConfig.yaml.j2') | from_yaml }}"
+  loop: "{{ baremetal.hosts | selectattr('network', 'defined') | list }}"
+  loop_control:
+    loop_var: host
+    label: "{{ host.name }}"
+
+- name: Create BareMetalHost resources
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'bareMetalHost.yaml.j2') | from_yaml }}"
+  loop: "{{ baremetal.hosts }}"
+  loop_control:
+    loop_var: host
+    label: "{{ host.name }}"
+
+- name: Wait for all agents to register and be approved
+  kubernetes.core.k8s_info:
+    api_version: agent-install.openshift.io/v1beta1
+    kind: Agent
+    namespace: "{{ cluster.name }}"
+  register: agents_status
+  until:
+    - agents_status.resources | length == baremetal.hosts | length
+  retries: 120
+  delay: 30
+
+- name: Wait for AgentClusterInstall to report installing or installed
+  kubernetes.core.k8s_info:
+    api_version: extensions.hive.openshift.io/v1beta1
+    kind: AgentClusterInstall
+    name: "{{ cluster.name }}"
+    namespace: "{{ cluster.name }}"
+  register: aci_status
+  until:
+    - aci_status.resources | length > 0
+    - >-
+      aci_status.resources[0].status.debugInfo.state is defined and
+      aci_status.resources[0].status.debugInfo.state in ['installing', 'finalizing', 'installed', 'adding-hosts']
+  retries: 60
+  delay: 30
+
+- name: Wait for cluster installation to complete
+  kubernetes.core.k8s_info:
+    api_version: extensions.hive.openshift.io/v1beta1
+    kind: AgentClusterInstall
+    name: "{{ cluster.name }}"
+    namespace: "{{ cluster.name }}"
+  register: aci_complete
+  until:
+    - aci_complete.resources | length > 0
+    - >-
+      aci_complete.resources[0].status.conditions is defined and
+      aci_complete.resources[0].status.conditions |
+        selectattr('type', 'equalto', 'Completed') |
+        selectattr('status', 'equalto', 'True') | list | length > 0
+  retries: 120
+  delay: 60
+
+- name: Get the admin kubeconfig secret name from ClusterDeployment
+  kubernetes.core.k8s_info:
+    api_version: hive.openshift.io/v1
+    kind: ClusterDeployment
+    name: "{{ cluster.name }}"
+    namespace: "{{ cluster.name }}"
+  register: cluster_deployment
+
+- name: Define the admin secret name
+  ansible.builtin.set_fact:
+    admin_secret_name: "{{ cluster_deployment.resources[0].spec.clusterMetadata.adminKubeconfigSecretRef.name }}"
+
+- name: Get the secret containing the kubeconfig
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ admin_secret_name }}"
+    namespace: "{{ cluster.name }}"
+  register: admin_secret_info
+
+- name: Decode and save kubeconfig to file
+  ansible.builtin.copy:
+    content: "{{ admin_secret_info.resources[0].data.kubeconfig | b64decode }}"
+    dest: "{{ deployment_config_dir }}/kubeconfig"
+    mode: '0600'
+
+- name: Create managedcluster resource
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'managedCluster.yaml.j2') | from_yaml }}"
+
+- name: Create an import secret using the kubeconfig
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "auto-import-secret"
+        namespace: "{{ cluster.name }}"
+      type: Opaque
+      data:
+        kubeconfig: "{{ lookup('file', '{{ deployment_config_dir }}/kubeconfig') | b64encode }}"
+  register: auto_import_secret
+
+- name: Create klusterletAddOnConfig
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ lookup('template', 'klusterletAddOnConfig.yaml.j2') | from_yaml }}"

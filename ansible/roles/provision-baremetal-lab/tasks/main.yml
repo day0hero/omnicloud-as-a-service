@@ -1,0 +1,27 @@
+---
+# Main tasks for provision-baremetal-lab role
+# Runs on the EC2 bare metal instance to set up libvirt + sushy-tools
+
+- name: Install virtualization packages
+  ansible.builtin.include_tasks: install-packages.yml
+  when: not lab_destroy | default(false) | bool
+
+- name: Configure libvirt networking
+  ansible.builtin.include_tasks: configure-networking.yml
+  when: not lab_destroy | default(false) | bool
+
+- name: Create virtual machines
+  ansible.builtin.include_tasks: create-vms.yml
+  when: not lab_destroy | default(false) | bool
+
+- name: Configure sushy-tools Redfish emulator
+  ansible.builtin.include_tasks: configure-sushy.yml
+  when: not lab_destroy | default(false) | bool
+
+- name: Generate baremetal host inventory
+  ansible.builtin.include_tasks: generate-host-inventory.yml
+  when: not lab_destroy | default(false) | bool
+
+- name: Destroy lab environment
+  ansible.builtin.include_tasks: destroy-lab.yml
+  when: lab_destroy | default(false) | bool

@@ -1,0 +1,52 @@
+---
+- name: Check if lab network already exists
+  ansible.builtin.command:
+    cmd: "virsh net-info {{ lab_network_name }}"
+  register: lab_net_info
+  ignore_errors: true
+  changed_when: false
+
+- name: Generate libvirt network XML
+  ansible.builtin.template:
+    src: libvirt-network.xml.j2
+    dest: /tmp/{{ lab_network_name }}.xml
+    mode: "0644"
+  when: lab_net_info.rc != 0
+
+- name: Define lab libvirt network
+  ansible.builtin.command:
+    cmd: "virsh net-define /tmp/{{ lab_network_name }}.xml"
+  when: lab_net_info.rc != 0
+
+- name: Start lab network
+  community.libvirt.virt_net:
+    name: "{{ lab_network_name }}"
+    state: active
+
+- name: Set lab network to autostart
+  community.libvirt.virt_net:
+    name: "{{ lab_network_name }}"
+    autostart: true
+
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Open firewall port for sushy-tools
+  ansible.posix.firewalld:
+    port: "{{ sushy_listen_port }}/tcp"
+    permanent: true
+    immediate: true
+    state: enabled
+
+- name: Open firewall for libvirt zone
+  ansible.posix.firewalld:
+    zone: libvirt
+    masquerade: true
+    permanent: true
+    immediate: true
+    state: enabled

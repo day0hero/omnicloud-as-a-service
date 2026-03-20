@@ -1,0 +1,63 @@
+---
+- name: Get list of running VMs
+  community.libvirt.virt:
+    command: list_vms
+  register: existing_vms
+
+- name: Destroy lab VMs
+  community.libvirt.virt:
+    name: "{{ item.name }}"
+    state: destroyed
+  loop: "{{ lab_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name in existing_vms.list_vms
+  ignore_errors: true
+
+- name: Undefine lab VMs
+  community.libvirt.virt:
+    name: "{{ item.name }}"
+    command: undefine
+  loop: "{{ lab_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name in existing_vms.list_vms
+  ignore_errors: true
+
+- name: Remove VM disk images
+  ansible.builtin.file:
+    path: "{{ lab_vm_disk_path }}/{{ item.name }}.qcow2"
+    state: absent
+  loop: "{{ lab_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Stop sushy-emulator service
+  ansible.builtin.systemd:
+    name: sushy-emulator
+    state: stopped
+    enabled: false
+  ignore_errors: true
+
+- name: Remove sushy-emulator service file
+  ansible.builtin.file:
+    path: /etc/systemd/system/sushy-emulator.service
+    state: absent
+
+- name: Remove sushy-tools configuration
+  ansible.builtin.file:
+    path: /etc/sushy-tools
+    state: absent
+
+- name: Destroy lab network
+  community.libvirt.virt_net:
+    name: "{{ lab_network_name }}"
+    state: absent
+  ignore_errors: true
+
+- name: Remove generated host inventory file
+  ansible.builtin.file:
+    path: "{{ playbook_dir }}/generated-baremetal-hosts.yml"
+    state: absent
+  delegate_to: localhost
+  become: false

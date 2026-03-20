@@ -1,0 +1,40 @@
+---
+- name: Create sushy-tools configuration directory
+  ansible.builtin.file:
+    path: /etc/sushy-tools
+    state: directory
+    mode: "0755"
+
+- name: Deploy sushy-emulator configuration
+  ansible.builtin.template:
+    src: sushy-emulator.conf.j2
+    dest: /etc/sushy-tools/sushy-emulator.conf
+    mode: "0644"
+  notify: Restart sushy-emulator
+
+- name: Deploy sushy-emulator systemd service
+  ansible.builtin.template:
+    src: sushy-emulator.service.j2
+    dest: /etc/systemd/system/sushy-emulator.service
+    mode: "0644"
+  notify: Restart sushy-emulator
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Enable and start sushy-emulator
+  ansible.builtin.systemd:
+    name: sushy-emulator
+    enabled: true
+    state: started
+
+- name: Wait for sushy-tools to be available
+  ansible.builtin.uri:
+    url: "http://localhost:{{ sushy_listen_port }}/redfish/v1/Systems"
+    method: GET
+    status_code: 200
+  register: sushy_health
+  retries: 10
+  delay: 5
+  until: sushy_health.status == 200

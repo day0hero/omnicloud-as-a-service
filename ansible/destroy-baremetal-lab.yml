@@ -1,0 +1,28 @@
+---
+# Destroy the baremetal lab environment
+# Tears down VMs, sushy-tools, and optionally the EC2 metal instance
+#
+# Usage:
+#   ansible-playbook destroy-baremetal-lab.yml -e "@baremetal-lab-vars.yml"
+
+- name: Destroy lab environment on metal instance
+  hosts: baremetal_lab_hosts
+  become: true
+  gather_facts: true
+  vars_files:
+    - baremetal-lab-vars.yml
+  vars:
+    lab_destroy: true
+  roles:
+    - provision-baremetal-lab
+
+- name: Destroy EC2 bare metal instance
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars_files:
+    - baremetal-lab-vars.yml
+  vars:
+    destroy: true
+  roles:
+    - provision-ec2

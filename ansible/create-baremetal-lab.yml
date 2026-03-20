@@ -1,0 +1,48 @@
+---
+# Provision a baremetal lab environment on AWS EC2 bare metal instances
+# Uses libvirt/KVM + sushy-tools to simulate baremetal hosts with Redfish BMC
+#
+# Usage:
+#   ansible-playbook create-baremetal-lab.yml -e "@baremetal-lab-vars.yml"
+
+- name: Provision EC2 bare metal instance
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  vars_files:
+    - baremetal-lab-vars.yml
+  roles:
+    - provision-ec2
+
+- name: Configure baremetal lab on metal instance
+  hosts: baremetal_lab_hosts
+  become: true
+  gather_facts: true
+  vars_files:
+    - baremetal-lab-vars.yml
+  roles:
+    - provision-baremetal-lab
+
+- name: Display lab information
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: Check if generated hosts file exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/generated-baremetal-hosts.yml"
+      register: gen_hosts_file
+
+    - name: Display generated baremetal hosts file location
+      ansible.builtin.debug:
+        msg:
+          - "Baremetal lab provisioning complete!"
+          - ""
+          - "Generated host inventory: {{ playbook_dir }}/generated-baremetal-hosts.yml"
+          - ""
+          - "To deploy an OpenShift cluster on this lab:"
+          - "  ansible-playbook site.yaml -i inventory.yml \\"
+          - "    -e '@baremetal-lab-vars.yml' \\"
+          - "    -e '@generated-baremetal-hosts.yml' \\"
+          - "    -e create=true --limit baremetal"
+      when: gen_hosts_file.stat.exists | default(false)

@@ -1,0 +1,14 @@
+[Unit]
+Description=Sushy Redfish Emulator
+After=libvirtd.service
+Requires=libvirtd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sushy-emulator --config /etc/sushy-tools/sushy-emulator.conf
+Restart=on-failure
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target

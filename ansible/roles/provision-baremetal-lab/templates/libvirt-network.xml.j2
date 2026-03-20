@@ -1,0 +1,17 @@
+<network>
+  <name>{{ lab_network_name }}</name>
+  <forward mode='nat'>
+    <nat>
+      <port start='1024' end='65535'/>
+    </nat>
+  </forward>
+  <bridge name='virbr-lab' stp='on' delay='0'/>
+  <ip address='{{ lab_network_gateway }}' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='{{ lab_network_dhcp_start }}' end='{{ lab_network_dhcp_end }}'/>
+{% for vm in lab_vms %}
+      <host mac='{{ vm.mac }}' name='{{ vm.name }}' ip='{{ vm.ip }}'/>
+{% endfor %}
+    </dhcp>
+  </ip>
+</network>

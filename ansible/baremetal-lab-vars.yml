@@ -1,0 +1,125 @@
+---
+# Baremetal Lab Configuration
+# EC2 bare metal instance + libvirt VMs + sushy-tools for testing
+# OpenShift baremetal deployments via ACM Assisted Installer
+
+# ============================================================================
+# EC2 Bare Metal Instance Configuration
+# ============================================================================
+ec2_instances_baremetal_lab:
+  - name: baremetal-lab
+    instance_name: baremetal-lab
+    instance_type: c5.metal
+    instance_ebs_size: 500
+    ec2_role: baremetal-lab
+    groups:
+      - baremetal_lab_hosts
+    # Set these to match your environment
+    # fqdn_nodot: baremetal-lab.example.com
+    # hosted_zone: example.com.
+
+# Merge into the ec2_instances list used by provision-ec2
+ec2_instances_idm: []
+ec2_instances_aap: []
+ec2_instances_satellite: []
+ec2_instances_all: "{{ ec2_instances_baremetal_lab }}"
+
+# AWS configuration (override as needed)
+aws_region: us-east-1
+key_name: baremetal-lab-key
+ssh_public_key_path: "~/.ssh/id_bastion.pub"
+vpc_security_group_name: baremetal-lab-sg
+
+# Additional security group rules for Redfish + provisioning
+security_group_rules_custom:
+  - proto: tcp
+    from_port: 8000
+    to_port: 8000
+    cidr_ip: "0.0.0.0/0"
+    rule_desc: "sushy-tools Redfish emulator"
+  - proto: tcp
+    from_port: 6443
+    to_port: 6443
+    cidr_ip: "0.0.0.0/0"
+    rule_desc: "OpenShift API"
+  - proto: tcp
+    from_port: 22623
+    to_port: 22623
+    cidr_ip: "0.0.0.0/0"
+    rule_desc: "OpenShift machine config server"
+
+# ============================================================================
+# Lab Network Configuration
+# ============================================================================
+lab_network_name: baremetal-net
+lab_network_cidr: "192.168.1.0/24"
+lab_network_gateway: "192.168.1.1"
+lab_network_dhcp_start: "192.168.1.100"
+lab_network_dhcp_end: "192.168.1.199"
+lab_dns_servers:
+  - "192.168.1.1"
+
+# ============================================================================
+# VM Definitions (simulated baremetal hosts)
+# ============================================================================
+# 3 masters + 2 workers for a standard HA cluster
+# Adjust vcpu/ram_mb based on available resources on c5.metal (96 vCPU, 192GB RAM)
+lab_vms:
+  - name: master-0
+    role: master
+    vcpu: 8
+    ram_mb: 32768
+    disk_gb: 120
+    mac: "52:54:00:aa:00:01"
+    ip: "192.168.1.10"
+  - name: master-1
+    role: master
+    vcpu: 8
+    ram_mb: 32768
+    disk_gb: 120
+    mac: "52:54:00:aa:00:02"
+    ip: "192.168.1.11"
+  - name: master-2
+    role: master
+    vcpu: 8
+    ram_mb: 32768
+    disk_gb: 120
+    mac: "52:54:00:aa:00:03"
+    ip: "192.168.1.12"
+  - name: worker-0
+    role: worker
+    vcpu: 8
+    ram_mb: 16384
+    disk_gb: 120
+    mac: "52:54:00:bb:00:01"
+    ip: "192.168.1.20"
+  - name: worker-1
+    role: worker
+    vcpu: 8
+    ram_mb: 16384
+    disk_gb: 120
+    mac: "52:54:00:bb:00:02"
+    ip: "192.168.1.21"
+
+# ============================================================================
+# sushy-tools Configuration
+# ============================================================================
+sushy_listen_port: 8000
+
+# ============================================================================
+# NIC Discovery
+# ============================================================================
+# Query sushy-tools Redfish API to auto-discover VM NIC interface names
+# When enabled, overrides the default 'enp1s0' with discovered names
+lab_discover_nics: false
+# Enable Redfish NIC discovery during cluster deployment (for real baremetal)
+baremetal_discover_nics: false
+
+# ============================================================================
+# Cluster Deploy Variables (used when deploying the OCP cluster)
+# ============================================================================
+cluster_name: baremetal-lab
+cluster_base_domain: example.com
+cloud_provider: BareMetal
+cloud_region: default
+cluster_group: devops

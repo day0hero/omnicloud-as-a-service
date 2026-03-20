@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: provision-baremetal-lab
+  author: omnicloud-as-a-service
+  description: >
+    Provisions a baremetal lab environment on an EC2 bare metal instance
+    using libvirt/KVM and sushy-tools (Redfish emulator) for testing
+    OpenShift baremetal deployments via ACM Assisted Installer.
+  license: Apache-2.0
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+
+dependencies: []

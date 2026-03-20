@@ -1,0 +1,35 @@
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: {{ host.name }}
+  namespace: {{ cluster.name }}
+  labels:
+    infraenvs.agent-install.openshift.io: {{ cluster.name }}
+  annotations:
+    bmac.agent-install.openshift.io/hostname: {{ host.name }}
+    bmac.agent-install.openshift.io/role: {{ host.role }}
+spec:
+  online: true
+  bootMACAddress: "{{ host.bootMACAddress }}"
+  automatedCleaningMode: disabled
+  bmc:
+    address: {{ host.bmc.address }}
+{% if baremetal.bmcCredentialsMode == 'perHost' %}
+    credentialsName: {{ host.bmc.credentialsName | default('bmc-secret-' + host.name) }}
+{% else %}
+    credentialsName: {{ baremetal.bmcSharedSecretName }}
+{% endif %}
+    disableCertificateVerification: {{ host.bmc.disableCertificateVerification | default(true) | lower }}
+{% if host.rootDeviceHints is defined %}
+  rootDeviceHints:
+{% if host.rootDeviceHints.deviceName is defined %}
+    deviceName: {{ host.rootDeviceHints.deviceName }}
+{% endif %}
+{% if host.rootDeviceHints.minSizeGigabytes is defined %}
+    minSizeGigabytes: {{ host.rootDeviceHints.minSizeGigabytes }}
+{% endif %}
+{% if host.rootDeviceHints.serialNumber is defined %}
+    serialNumber: {{ host.rootDeviceHints.serialNumber }}
+{% endif %}
+{% endif %}

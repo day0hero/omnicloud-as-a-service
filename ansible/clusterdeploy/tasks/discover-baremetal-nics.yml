@@ -1,0 +1,168 @@
+---
+# Discover NIC information from baremetal hosts via Redfish BMC
+# Queries each host's BMC for EthernetInterfaces and maps BMC port IDs
+# to predictable Linux interface names.
+#
+# Supports: Dell iDRAC, HPE iLO, Supermicro, sushy-tools (libvirt lab)
+# Set baremetal.discoverNics: true to enable this pre-flight step.
+
+- name: Set BMC credentials for Redfish queries
+  ansible.builtin.set_fact:
+    _bmc_username: "{{ bmc_shared_username | default('admin') }}"
+    _bmc_password: "{{ bmc_shared_password | default('password') }}"
+
+- name: Extract Redfish base URL from each host's BMC address
+  ansible.builtin.set_fact:
+    _hosts_with_redfish: >-
+      {{ _hosts_with_redfish | default([]) + [{
+        'host': item,
+        'redfish_base': 'https://' + (item.bmc.address |
+          regex_replace('^(redfish-virtualmedia|redfish|idrac-virtualmedia|ilo5-virtualmedia)://', '') |
+          regex_replace('/redfish/v1/Systems/.*$', ''))
+      }] }}
+  loop: "{{ baremetal.hosts }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Query BMC for system Ethernet interfaces
+  ansible.builtin.uri:
+    url: "{{ item.redfish_base }}/redfish/v1/Systems/1/EthernetInterfaces"
+    user: "{{ item.host.bmc.username | default(_bmc_username) }}"
+    password: "{{ item.host.bmc.password | default(_bmc_password) }}"
+    validate_certs: false
+    force_basic_auth: true
+    method: GET
+    return_content: true
+    status_code: [200, 404]
+  register: _nic_collection_results
+  loop: "{{ _hosts_with_redfish }}"
+  loop_control:
+    label: "{{ item.host.name }}"
+  ignore_errors: true
+
+- name: Query individual EthernetInterface details
+  ansible.builtin.uri:
+    url: "{{ item.0.redfish_base }}{{ member['@odata.id'] }}"
+    user: "{{ item.0.host.bmc.username | default(_bmc_username) }}"
+    password: "{{ item.0.host.bmc.password | default(_bmc_password) }}"
+    validate_certs: false
+    force_basic_auth: true
+    method: GET
+    return_content: true
+    status_code: [200]
+  register: _nic_detail_results
+  loop: >-
+    {{ _nic_collection_results.results | subelements('json.Members', skip_missing=True) }}
+  loop_control:
+    label: "{{ item.0.item.host.name }}/{{ member['@odata.id'] | default('unknown') }}"
+  vars:
+    member: "{{ item.1 }}"
+  when:
+    - item.0.status is defined
+    - item.0.status == 200
+    - item.0.json.Members is defined
+  ignore_errors: true
+
+- name: Build raw NIC data per host
+  ansible.builtin.set_fact:
+    _raw_nic_data: >-
+      {{ _raw_nic_data | default({}) | combine({
+        item.item.0.item.host.name: (_raw_nic_data | default({}))[item.item.0.item.host.name] | default([]) + [{
+          'id': item.json.Id | default(''),
+          'mac': item.json.MACAddress | default('') | upper,
+          'link_status': item.json.LinkStatus | default('NoLink'),
+          'speed_mbps': item.json.SpeedMbps | default(0),
+          'name': item.json.Name | default(''),
+          'description': item.json.Description | default('')
+        }]
+      }) }}
+  loop: "{{ _nic_detail_results.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.0.item.host.name | default('unknown') }}/{{ item.json.Id | default('unknown') }}"
+  when:
+    - item.json is defined
+    - item.json.Id is defined
+
+# Vendor-specific mapping: BMC port ID -> Linux interface name
+# Dell iDRAC patterns:
+#   NIC.Integrated.1-1 -> eno1, NIC.Integrated.1-2 -> eno2
+#   NIC.Slot.3-1 -> ens3f0, NIC.Slot.3-2 -> ens3f1
+#   NIC.Slot.4-1 -> ens4f0
+# HPE iLO patterns:
+#   1 -> eno1, 2 -> eno2 (embedded)
+#   NIC.Slot.X.Y -> ensXfY
+# sushy-tools/libvirt:
+#   Simple numeric IDs -> enp{N}s0
+# Generic fallback: match by MAC from bootMACAddress
+
+- name: Map BMC NIC IDs to Linux interface names
+  ansible.builtin.set_fact:
+    _discovered_interfaces: >-
+      {{ _discovered_interfaces | default({}) | combine({
+        item.name: _mapped_interface
+      }) }}
+  vars:
+    _host_nics: "{{ _raw_nic_data[item.name] | default([]) }}"
+    _boot_mac: "{{ item.bootMACAddress | upper }}"
+    _boot_nic: "{{ _host_nics | selectattr('mac', 'equalto', _boot_mac) | list | first | default({}) }}"
+    _nic_id: "{{ _boot_nic.id | default('') }}"
+    _mapped_interface: >-
+      {%- if _nic_id == '' -%}
+        {{ item.network.interface | default('eno1') }}
+      {%- elif _nic_id | regex_search('^NIC\\.Integrated\\.(\\d+)-(\\d+)$') -%}
+        eno{{ _nic_id | regex_replace('^NIC\\.Integrated\\.\\d+-', '') }}
+      {%- elif _nic_id | regex_search('^NIC\\.Slot\\.(\\d+)-(\\d+)$') -%}
+        ens{{ _nic_id | regex_replace('^NIC\\.Slot\\.(\\d+)-(\\d+)$', '\\1f\\2') | regex_replace('f(\\d+)$', 'f' + ((_nic_id | regex_replace('^NIC\\.Slot\\.\\d+-', '') | int) - 1) | string) }}
+      {%- elif _nic_id | regex_search('^\\d+$') -%}
+        enp{{ _nic_id }}s0
+      {%- else -%}
+        {{ item.network.interface | default('eno1') }}
+      {%- endif -%}
+  loop: "{{ baremetal.hosts }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Display discovered NIC mappings
+  ansible.builtin.debug:
+    msg: >-
+      Host: {{ item.key }},
+      BMC NIC ID: {{ (_raw_nic_data[item.key] | default([]) |
+        selectattr('mac', 'equalto', (baremetal.hosts |
+        selectattr('name', 'equalto', item.key) | first).bootMACAddress | upper) |
+        first | default({})).id | default('N/A') }},
+      Linux interface: {{ item.value }}
+  loop: "{{ _discovered_interfaces | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Update baremetal hosts with discovered interface names
+  ansible.builtin.set_fact:
+    baremetal: >-
+      {{ baremetal | combine({
+        'hosts': baremetal.hosts | map('combine', {}) | list
+      }) }}
+
+- name: Apply discovered interfaces to host network config
+  ansible.builtin.set_fact:
+    _updated_hosts: >-
+      {{ _updated_hosts | default([]) + [
+        item | combine({
+          'network': (item.network | default({})) | combine({
+            'interface': _discovered_interfaces[item.name] | default(item.network.interface | default('eno1'))
+          })
+        })
+      ] }}
+  loop: "{{ baremetal.hosts }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Set updated baremetal hosts with discovered NICs
+  ansible.builtin.set_fact:
+    baremetal: "{{ baremetal | combine({'hosts': _updated_hosts}) }}"
+
+- name: Display final host interface assignments
+  ansible.builtin.debug:
+    msg: "{{ item.name }}: {{ item.network.interface | default('NOT SET') }} (MAC: {{ item.bootMACAddress }})"
+  loop: "{{ baremetal.hosts }}"
+  loop_control:
+    label: "{{ item.name }}"

@@ -1,0 +1,39 @@
+---
+apiVersion: extensions.hive.openshift.io/v1beta1
+kind: AgentClusterInstall
+metadata:
+  name: {{ cluster.name }}
+  namespace: {{ cluster.name }}
+spec:
+  clusterDeploymentRef:
+    name: {{ cluster.name }}
+  imageSetRef:
+    name: {{ cluster.version }}
+  networking:
+    clusterNetwork:
+      - cidr: 10.128.0.0/14
+        hostPrefix: 23
+    serviceNetwork:
+      - 172.30.0.0/16
+    machineNetwork:
+      - cidr: {{ baremetal.machineNetwork }}
+    networkType: OVNKubernetes
+{% if baremetal.apiVIPs | length > 0 %}
+  apiVIPs:
+{% for vip in baremetal.apiVIPs %}
+    - {{ vip }}
+{% endfor %}
+{% endif %}
+{% if baremetal.ingressVIPs | length > 0 %}
+  ingressVIPs:
+{% for vip in baremetal.ingressVIPs %}
+    - {{ vip }}
+{% endfor %}
+{% endif %}
+  provisionRequirements:
+    controlPlaneAgents: {{ baremetal.hosts | selectattr('role', 'equalto', 'master') | list | length }}
+{% if baremetal.hosts | selectattr('role', 'equalto', 'worker') | list | length > 0 %}
+    workerAgents: {{ baremetal.hosts | selectattr('role', 'equalto', 'worker') | list | length }}
+{% endif %}
+  sshPublicKey: |-
+    {{ baremetal.sshPublicKey }}

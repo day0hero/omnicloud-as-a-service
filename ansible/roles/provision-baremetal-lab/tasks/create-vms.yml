@@ -1,0 +1,51 @@
+---
+- name: Ensure VM disk directory exists
+  ansible.builtin.file:
+    path: "{{ lab_vm_disk_path }}"
+    state: directory
+    mode: "0755"
+
+- name: Check which VMs already exist
+  community.libvirt.virt:
+    command: list_vms
+  register: existing_vms
+
+- name: Create VM disk images
+  ansible.builtin.command:
+    cmd: >
+      qemu-img create -f qcow2
+      {{ lab_vm_disk_path }}/{{ item.name }}.qcow2
+      {{ item.disk_gb | default(lab_vm_default_disk_gb) }}G
+    creates: "{{ lab_vm_disk_path }}/{{ item.name }}.qcow2"
+  loop: "{{ lab_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name not in existing_vms.list_vms
+
+- name: Create VMs with virt-install
+  ansible.builtin.command:
+    cmd: >
+      virt-install
+      --name {{ item.name }}
+      --vcpus {{ item.vcpu | default(lab_vm_default_vcpu) }}
+      --memory {{ item.ram_mb | default(lab_vm_default_ram_mb) }}
+      --disk path={{ lab_vm_disk_path }}/{{ item.name }}.qcow2,format=qcow2,bus=virtio
+      --network network={{ lab_network_name }},mac={{ item.mac }}
+      --os-variant {{ item.os_variant | default(lab_vm_default_os_variant) }}
+      --boot hd,cdrom,network
+      --noautoconsole
+      --noreboot
+      --import
+  loop: "{{ lab_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.name not in existing_vms.list_vms
+
+- name: Ensure all VMs are shut off (sushy-tools manages power state)
+  community.libvirt.virt:
+    name: "{{ item.name }}"
+    state: shutdown
+  loop: "{{ lab_vms }}"
+  loop_control:
+    label: "{{ item.name }}"
+  ignore_errors: true

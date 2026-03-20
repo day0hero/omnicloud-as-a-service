@@ -1,0 +1,47 @@
+---
+apiVersion: agent-install.openshift.io/v1beta1
+kind: NMStateConfig
+metadata:
+  name: {{ host.name }}
+  namespace: {{ cluster.name }}
+  labels:
+    cluster-name: {{ cluster.name }}
+spec:
+  config:
+    interfaces:
+      - name: {{ host.network.interface }}
+        type: ethernet
+        state: up
+        ipv4:
+          enabled: true
+          dhcp: false
+          address:
+            - ip: {{ host.network.ip }}
+              prefix-length: {{ host.network.prefix }}
+{% if host.network.ipv6 is defined %}
+        ipv6:
+          enabled: true
+          dhcp: false
+          address:
+            - ip: {{ host.network.ipv6.ip }}
+              prefix-length: {{ host.network.ipv6.prefix }}
+{% endif %}
+    dns-resolver:
+      config:
+        server:
+{% for dns in host.network.dns %}
+          - {{ dns }}
+{% endfor %}
+    routes:
+      config:
+        - destination: 0.0.0.0/0
+          next-hop-address: {{ host.network.gateway }}
+          next-hop-interface: {{ host.network.interface }}
+{% if host.network.ipv6 is defined and host.network.ipv6.gateway is defined %}
+        - destination: "::/0"
+          next-hop-address: {{ host.network.ipv6.gateway }}
+          next-hop-interface: {{ host.network.interface }}
+{% endif %}
+  interfaces:
+    - name: {{ host.network.interface }}
+      macAddress: "{{ host.bootMACAddress }}"

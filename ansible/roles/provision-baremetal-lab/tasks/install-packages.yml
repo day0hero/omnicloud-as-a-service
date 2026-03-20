@@ -1,0 +1,33 @@
+---
+- name: Install virtualization packages
+  ansible.builtin.dnf:
+    name:
+      - libvirt
+      - libvirt-daemon-kvm
+      - qemu-kvm
+      - virt-install
+      - libguestfs-tools
+      - python3-libvirt
+      - python3-pip
+      - python3-lxml
+      - firewalld
+    state: present
+
+- name: Enable and start libvirtd
+  ansible.builtin.systemd:
+    name: libvirtd
+    enabled: true
+    state: started
+
+- name: Enable and start firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: true
+    state: started
+
+- name: Install sushy-tools via pip
+  ansible.builtin.pip:
+    name:
+      - sushy-tools
+      - libvirt-python
+    state: present
