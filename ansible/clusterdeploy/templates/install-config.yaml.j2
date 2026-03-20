@@ -16,6 +16,8 @@ controlPlane:
 {% elif cloud.provider == 'Google' %}
     gcp:
       type: {{ machinePools.controlPlane.machineType }}
+{% elif cloud.provider == 'BareMetal' %}
+    baremetal: {}
 {% else %}
     aws:
       rootVolume:
@@ -37,6 +39,8 @@ compute:
 {% elif cloud.provider == 'Google' %}
     gcp:
       type: {{ machinePools.workers.machineType }}
+{% elif cloud.provider == 'BareMetal' %}
+    baremetal: {}
 {% else %}
     aws:
       rootVolume:
@@ -50,7 +54,11 @@ networking:
   - cidr: 10.128.0.0/14
     hostPrefix: 23
   machineNetwork:
+{% if cloud.provider == 'BareMetal' %}
+  - cidr: {{ baremetal.machineNetwork }}
+{% else %}
   - cidr: 10.0.0.0/16
+{% endif %}
   serviceNetwork:
   - 172.30.0.0/16
 platform:
@@ -63,6 +71,34 @@ platform:
     cloudName: {{ cloudConfig.azure.cloudName | default('AzurePublicCloud')}}
     baseDomainResourceGroupName: {{ cloudConfig.azure.baseDomainResourceGroupName }}
     region: {{ cloud.region }}
+{% elif cloud.provider == 'BareMetal' %}
+  baremetal:
+    apiVIPs:
+{% for vip in baremetal.apiVIPs %}
+      - {{ vip }}
+{% endfor %}
+    ingressVIPs:
+{% for vip in baremetal.ingressVIPs %}
+      - {{ vip }}
+{% endfor %}
+    provisioningNetwork: {{ baremetal.provisioningNetwork }}
+    hosts:
+{% for host in baremetal.hosts %}
+      - name: {{ host.name }}
+        role: {{ host.role }}
+        bmc:
+          address: {{ host.bmc.address }}
+          username: {{ host.bmc.username | default('') }}
+          password: {{ host.bmc.password | default('') }}
+          disableCertificateVerification: {{ host.bmc.disableCertificateVerification | default(true) | lower }}
+        bootMACAddress: "{{ host.bootMACAddress }}"
+{% if host.rootDeviceHints is defined %}
+        rootDeviceHints:
+{% if host.rootDeviceHints.deviceName is defined %}
+          deviceName: {{ host.rootDeviceHints.deviceName }}
+{% endif %}
+{% endif %}
+{% endfor %}
 {% else %}
   aws:
     region: {{ cloud.region }}

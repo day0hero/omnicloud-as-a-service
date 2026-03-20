@@ -14,3 +14,16 @@ azureCreds:
 
 gcpCreds:
   key: secret/data/hub/gcp
+
+bmcCreds:
+  perHost: false
+  key: secret/data/hub/bmc
+  hosts: []
+  # Per-host mode (set perHost: true and populate hosts):
+  # hosts:
+  #   - name: master-0
+  #     key: secret/data/hub/bmc-master-0
+  #   - name: master-1
+  #     key: secret/data/hub/bmc-master-1
+  #   - name: worker-0
+  #     key: secret/data/hub/bmc-worker-0

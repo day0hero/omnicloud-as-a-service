@@ -9,37 +9,58 @@ metadata:
     cloud: GCP
 {% elif cloud.provider == 'Azure' %}
     cloud: Azure
+{% elif cloud.provider == 'BareMetal' %}
+    cloud: BareMetal
 {% else %}
     cloud: AWS
 {% endif %}
+{% if cloud.provider != 'BareMetal' %}
     region: {{ cloud.region }}
+{% endif %}
     vendor: OpenShift
     cluster.open-cluster-management.io/clusterset: 'default'
 spec:
   baseDomain: {{ cluster.baseDomain }}
   clusterName: {{ cluster.name }}
+{% if cloud.provider == 'BareMetal' and baremetal.provisioningMethod == 'assisted' %}
+  clusterInstallRef:
+    group: extensions.hive.openshift.io
+    version: v1beta1
+    kind: AgentClusterInstall
+    name: {{ cluster.name }}
+  platform:
+    agentBareMetal:
+      agentSelector:
+        matchLabels:
+          cluster-name: {{ cluster.name }}
+{% else %}
   installAttemptsLimit: 1
   platform:
 {% if cloud.provider == 'Google' %}
     gcp:
-      credentialsSecretRef: 
+      credentialsSecretRef:
         name: gcp-creds
 {% elif cloud.provider == 'Azure' %}
     azure:
       baseDomainResourceGroupName: {{ cloudConfig.azure.baseDomainResourceGroupName }}
       cloudName: {{ cloudConfig.azure.cloudName | default('AzurePublicCloud')}}
-      credentialsSecretRef: 
+      credentialsSecretRef:
         name: azure-creds
+{% elif cloud.provider == 'BareMetal' %}
+    baremetal: {}
 {% else %}
     aws:
-      credentialsSecretRef: 
+      credentialsSecretRef:
         name: aws-creds
 {% endif %}
+{% if cloud.provider != 'BareMetal' %}
       region: {{ cloud.region }}
+{% endif %}
   provisioning:
     installConfigSecretRef:
       name: {{ cluster.name }}-install-config
     imageSetRef:
       name: {{ cluster.version }}
+{% endif %}
   pullSecretRef:
     name: global-pullsecret

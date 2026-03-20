@@ -32,3 +32,4 @@ cloudConfig:
   gcp:
     projectID: "{{ gcp_project_id }}"
   aws: {}
+  baremetal: {}

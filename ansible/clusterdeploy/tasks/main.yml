@@ -26,6 +26,15 @@
         and not (create_cluster | default(false) | bool)
       }}
 
+- name: "Discover baremetal NIC interfaces from BMC via Redfish"
+  ansible.builtin.include_tasks: discover-baremetal-nics.yml
+  when:
+    - cloud.provider == 'BareMetal'
+    - baremetal.discoverNics | default(false) | bool
+    - (create or debug_task)
+    - not (clusterdeploy_destroy | default(false) | bool)
+    - baremetal.hosts | length > 0
+
 - name: "Copy provider secrets from hive namespace - if not using user_provided_credentials"
   ansible.builtin.include_tasks: copy-provider-secrets.yml
   when:
@@ -42,12 +51,22 @@
   when:
     - (create or debug_task)
     - not (clusterdeploy_destroy | default(false) | bool)
+    - not (cloud.provider == 'BareMetal' and baremetal.provisioningMethod == 'assisted')
 
-- name: "Create cluster tasks"
+- name: "Create cluster tasks (cloud / hive-ipi baremetal)"
   ansible.builtin.include_tasks: createCluster.yml
   when:
     - create
     - not (clusterdeploy_destroy | default(false) | bool)
+    - not (cloud.provider == 'BareMetal' and baremetal.provisioningMethod == 'assisted')
+
+- name: "Create baremetal cluster tasks (assisted installer)"
+  ansible.builtin.include_tasks: createBaremetalAssistedCluster.yml
+  when:
+    - create
+    - not (clusterdeploy_destroy | default(false) | bool)
+    - cloud.provider == 'BareMetal'
+    - baremetal.provisioningMethod == 'assisted'
 
 - name: Destroy cluster tasks
   ansible.builtin.include_tasks: destroyCluster.yml

@@ -17,3 +17,15 @@ cluster:
 cloudConfig:
   azure:
     cloudName: AzurePublicCloud
+  baremetal: {}
+
+baremetal:
+  provisioningMethod: assisted
+  provisioningNetwork: Disabled
+  bmcCredentialsMode: shared
+  bmcSharedSecretName: bmc-creds
+  machineNetwork: "192.168.1.0/24"
+  apiVIPs: []
+  ingressVIPs: []
+  hosts: []
+  discoverNics: false

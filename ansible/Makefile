@@ -46,3 +46,15 @@ idm-install: ## Provision ec2 and install IDM - idm-vars to describe server
 .PHONY: idm-destroy
 idm-destroy: ## Deletes the ec2 and dns records for the provisioned IDM
 	ansible-playbook destroy-idm-infra.yml
+
+.PHONY: lab-create
+lab-create: ## Create baremetal lab (EC2 metal + libvirt VMs + sushy-tools)
+	ansible-playbook create-baremetal-lab.yml -e "@baremetal-lab-vars.yml"
+
+.PHONY: lab-destroy
+lab-destroy: ## Destroy baremetal lab (VMs, sushy-tools, and EC2 instance)
+	ansible-playbook destroy-baremetal-lab.yml -e "@baremetal-lab-vars.yml"
+
+.PHONY: lab-deploy
+lab-deploy: ## Deploy OpenShift on baremetal lab (requires lab-create first)
+	ansible-playbook site.yaml -i inventory.yml -e "@baremetal-lab-vars.yml" -e "@generated-baremetal-hosts.yml" -e create=true --limit baremetal

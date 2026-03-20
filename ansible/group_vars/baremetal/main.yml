@@ -4,24 +4,69 @@
 # Cloud provider identifier
 cloud:
   provider: "{{ cloud_provider | default('BareMetal') }}"
+  region: "{{ cloud_region | default('default') }}"
 
 # Baremetal-specific cluster configuration
 cluster:
   baseDomain: "{{ cluster_base_domain }}"
 
-# Baremetal-specific cloud configuration
-cloudConfig:
-  baremetal: {}
-  # Baremetal configurations would go here
-  # Examples: BMC credentials, provisioning network, etc.
+baremetal:
+  # Provisioning method: 'assisted' (ACM Assisted Installer) or 'hive-ipi' (Hive BareMetal IPI)
+  provisioningMethod: "{{ baremetal_provisioning_method | default('assisted') }}"
 
-# Baremetal-specific machine pool defaults
+  # Virtual IPs for the OpenShift API and Ingress
+  apiVIPs:
+    - "{{ baremetal_api_vip }}"
+  ingressVIPs:
+    - "{{ baremetal_ingress_vip }}"
+
+  # Provisioning network: 'Disabled', 'Managed', or 'Unmanaged'
+  provisioningNetwork: "{{ baremetal_provisioning_network | default('Disabled') }}"
+
+  # SSH public key for node access
+  sshPublicKey: "{{ lookup('env', 'ssh_public_key') }}"
+
+  # BMC credentials mode: 'shared' (single secret) or 'perHost' (one secret per host)
+  bmcCredentialsMode: "{{ baremetal_bmc_credentials_mode | default('shared') }}"
+
+  # Shared BMC credentials secret name (used when bmcCredentialsMode == 'shared')
+  bmcSharedSecretName: "{{ baremetal_bmc_shared_secret | default('bmc-creds') }}"
+
+  # Machine network CIDR for assisted installer
+  machineNetwork: "{{ baremetal_machine_network | default('192.168.1.0/24') }}"
+
+  # Auto-discover NIC interface names from BMC via Redfish before provisioning
+  # Queries each host's BMC EthernetInterfaces and maps BMC port IDs to Linux names
+  # Supports Dell iDRAC, HPE iLO, Supermicro, sushy-tools (libvirt lab)
+  discoverNics: "{{ baremetal_discover_nics | default(false) }}"
+
+  # Host definitions
+  # Each host must define: name, role, bmc, bootMACAddress
+  # Optional per-host: rootDeviceHints, network (for static IP)
+  #
+  # Example:
+  #   - name: master-0
+  #     role: master
+  #     bmc:
+  #       address: redfish-virtualmedia://bmc.example.com/redfish/v1/Systems/1
+  #       credentialsName: bmc-secret-master-0  # per-host, or omit to use shared
+  #       disableCertificateVerification: true
+  #     bootMACAddress: "aa:bb:cc:dd:ee:ff"
+  #     rootDeviceHints:
+  #       deviceName: /dev/sda
+  #     network:
+  #       interface: ens1f0
+  #       ip: 192.168.1.10
+  #       prefix: 24
+  #       gateway: 192.168.1.1
+  #       dns:
+  #         - 192.168.1.1
+  hosts: "{{ baremetal_hosts | default([]) }}"
+
+# Baremetal does not use cloud-style machine pools;
+# control plane and worker counts are derived from the hosts list
 machinePools:
   controlPlane:
-    machineType: "{{ control_plane_machine_type }}"
-    disk:
-      size: 200  # GB
+    replicas: "{{ baremetal_hosts | default([]) | selectattr('role', 'equalto', 'master') | list | length }}"
   workers:
-    machineType: "{{ worker_machine_type }}"
-    disk:
-      size: 200  # GB
+    replicas: "{{ baremetal_hosts | default([]) | selectattr('role', 'equalto', 'worker') | list | length }}"

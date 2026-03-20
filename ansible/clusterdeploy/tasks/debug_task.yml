@@ -16,3 +16,55 @@
     src: klusterletAddOnConfig.yaml.j2
     dest: "{{ deployment_config_dir }}/klusterletAddOnConfig.yaml"
     mode: "0644"
+
+- name: Generate the install-config template
+  ansible.builtin.template:
+    src: install-config.yaml.j2
+    dest: "{{ deployment_config_dir }}/install-config.yaml"
+    mode: "0644"
+  when: not (cloud.provider == 'BareMetal' and baremetal.provisioningMethod == 'assisted')
+
+- name: Generate the agentClusterInstall template
+  ansible.builtin.template:
+    src: agentClusterInstall.yaml.j2
+    dest: "{{ deployment_config_dir }}/agentClusterInstall.yaml"
+    mode: "0644"
+  when:
+    - cloud.provider == 'BareMetal'
+    - baremetal.provisioningMethod == 'assisted'
+
+- name: Generate the infraEnv template
+  ansible.builtin.template:
+    src: infraEnv.yaml.j2
+    dest: "{{ deployment_config_dir }}/infraEnv.yaml"
+    mode: "0644"
+  when:
+    - cloud.provider == 'BareMetal'
+    - baremetal.provisioningMethod == 'assisted'
+
+- name: Generate BareMetalHost templates
+  ansible.builtin.template:
+    src: bareMetalHost.yaml.j2
+    dest: "{{ deployment_config_dir }}/bareMetalHost-{{ host.name }}.yaml"
+    mode: "0644"
+  loop: "{{ baremetal.hosts }}"
+  loop_control:
+    loop_var: host
+    label: "{{ host.name }}"
+  when:
+    - cloud.provider == 'BareMetal'
+    - baremetal.provisioningMethod == 'assisted'
+    - baremetal.hosts | length > 0
+
+- name: Generate NMStateConfig templates
+  ansible.builtin.template:
+    src: nmStateConfig.yaml.j2
+    dest: "{{ deployment_config_dir }}/nmStateConfig-{{ host.name }}.yaml"
+    mode: "0644"
+  loop: "{{ baremetal.hosts | selectattr('network', 'defined') | list }}"
+  loop_control:
+    loop_var: host
+    label: "{{ host.name }}"
+  when:
+    - cloud.provider == 'BareMetal'
+    - baremetal.provisioningMethod == 'assisted'

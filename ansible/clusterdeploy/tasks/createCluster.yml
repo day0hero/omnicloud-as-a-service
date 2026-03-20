@@ -38,13 +38,19 @@
     src: machinePool-worker.yaml.j2
     dest: "{{ deployment_config_dir }}/machinepool-worker.yaml"
     mode: "0644"
-  when: cloud.provider != 'Google' and cloud.provider != 'Azure'
+  when:
+    - cloud.provider != 'Google'
+    - cloud.provider != 'Azure'
+    - cloud.provider != 'BareMetal'
 
 - name: Create worker MachinePool resource
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('template', 'machinePool-worker.yaml.j2') | from_yaml }}"
-  when: cloud.provider != 'Google' and cloud.provider != 'Azure'
+  when:
+    - cloud.provider != 'Google'
+    - cloud.provider != 'Azure'
+    - cloud.provider != 'BareMetal'
 
 - name: Wait for adminKubeconfigSecretRef to be populated
   kubernetes.core.k8s_info:
